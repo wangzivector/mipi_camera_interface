@@ -1,5 +1,8 @@
 #include "parameter.h"
 
+int force_format = 0;
+
+
 void option_usage(FILE *fp, int argc, char **argv)
 {
     fprintf(fp,
@@ -9,7 +12,7 @@ void option_usage(FILE *fp, int argc, char **argv)
             "-s | --save image    image folder path name: [%s]\n"
             "-h | --help          Print this message\n"
             "-m | --mmap          Use memory mapped buffers [default]\n"
-            "-r | --read          Use read() calls\n"
+            "-d | --display iamge show_image_enable\n"
             "-u | --userp         Use application allocated buffers\n"
             "-o | --output        Outputs stream to stdout\n"
             "-f | --format        Force format to 640x480 YUYV\n"
@@ -21,14 +24,14 @@ void option_usage(FILE *fp, int argc, char **argv)
 int set_option(int argc, char **argv)
 {
 
-const char short_options[] = "s:hmruofc:";
+const char short_options[] = "s:hmduofc:";
 
 const struct option
     long_options[] = {
         {"save", required_argument, NULL, 's'},
         {"help", no_argument, NULL, 'h'},
         {"mmap", no_argument, NULL, 'm'},
-        {"read", no_argument, NULL, 'r'},
+        {"disp", no_argument, NULL, 'd'},
         {"userp", no_argument, NULL, 'u'},
         {"output", no_argument, NULL, 'o'},
         {"format", no_argument, NULL, 'f'},
@@ -52,7 +55,7 @@ const struct option
             break;
 
         case 's':
-            save_iamge_enable = 1;
+            save_image_enable = 1;
             save_folder = optarg;
             break;
 
@@ -64,8 +67,8 @@ const struct option
             io = IO_METHOD_MMAP;
             break;
 
-        case 'r':
-            io = IO_METHOD_READ;
+        case 'd':
+            show_image_enable = 1;
             break;
 
         case 'u':
@@ -73,11 +76,10 @@ const struct option
             break;
 
         case 'o':
-            // out_buf++;
             break;
 
         case 'f':
-            force_format++;
+            force_format = 1;
             break;
 
         case 'c':

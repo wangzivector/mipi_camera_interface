@@ -1,0 +1,100 @@
+### stream out demo
+v4l2-ctl --stream-mmap --stream-count=-1 -d /dev/video0 --stream-to=/dev/null
+
+### support mode print
+v4l2-ctl --device /dev/video0 --list-formats-ext
+
+---
+ioctl: VIDIOC_ENUM_FMT
+	Type: Video Capture
+
+	[0]: 'Y10P' (10-bit Greyscale (MIPI Packed))
+		Size: Discrete 1280x800
+		Size: Discrete 1280x720
+		Size: Discrete 640x400
+	[1]: 'Y10 ' (10-bit Greyscale)
+		Size: Discrete 1280x800
+		Size: Discrete 1280x720
+		Size: Discrete 640x400
+	[2]: 'GREY' (8-bit Greyscale)
+		Size: Discrete 1280x800
+		Size: Discrete 1280x720
+
+		
+		Size: Discrete 640x400
+---
+
+# FORMAT
+# ioctl: VIDIOC_ENUM_FMT
+# 	Type: Video Capture
+
+# 	[0]: 'YU12' (Planar YUV 4:2:0)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[1]: 'YUYV' (YUYV 4:2:2)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[2]: 'RGB3' (24-bit RGB 8-8-8)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[3]: 'JPEG' (JFIF JPEG, compressed)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[4]: 'H264' (H.264, compressed)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[5]: 'MJPG' (Motion-JPEG, compressed)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[6]: 'YVYU' (YVYU 4:2:2)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[7]: 'VYUY' (VYUY 4:2:2)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[8]: 'UYVY' (UYVY 4:2:2)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[9]: 'NV12' (Y/CbCr 4:2:0)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[10]: 'BGR3' (24-bit BGR 8-8-8)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[11]: 'YV12' (Planar YVU 4:2:0)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[12]: 'NV21' (Y/CrCb 4:2:0)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+# 	[13]: 'RX24' (32-bit XBGR 8-8-8-8)
+# 		Size: Stepwise 32x32 - 2592x1944 with step 2/2
+
+
+# raspistill -p -f -t 20000
+---
+
+### display
+raspistill -p -f -t 20
+
+
+Open camera...
+Found sensor ov9281 at address 60
+mode: 0, width: 1280, height: 800, pixelformat: GREY, desc:  1 lan raw8 60fps
+mode: 1, width: 1280, height: 720, pixelformat: GREY, desc: (null)
+mode: 2, width: 640, height: 400, pixelformat: GREY, desc: (null)
+mode: 3, width: 320, height: 200, pixelformat: GREY, desc: (null)
+mode: 4, width: 160, height: 100, pixelformat: GREY, desc: (null)
+mode: 5, width: 1280, height: 800, pixelformat: GREY, desc: Used for ov9281 2lans raw8
+mode: 6, width: 1280, height: 800, pixelformat: Y10P, desc: Used for ov9281 2lans raw10
+mode: 7, width: 1280, height: 800, pixelformat: GREY, desc: Used for ov9281 1lane raw8 1280x800 external trigger mode
+mode: 8, width: 1280, height: 720, pixelformat: GREY, desc: Used for ov9281 1lane raw8 1280x720 external trigger mode
+mode: 9, width: 640, height: 400, pixelformat: GREY, desc: Used for ov9281 1lane raw8 640x400 external trigger mode
+mode: 10, width: 320, height: 200, pixelformat: GREY, desc: Used for ov9281 1lane raw8 320x200 external trigger mode
+mode: 11, width: 1280, height: 800, pixelformat: GREY, desc: Used for ov9281 2lanes raw8 1280x800 external trigger mode
+mode: 12, width: 1280, height: 800, pixelformat: Y10P, desc: Used for ov9281 2lanes raw10 1280x800 external trigger mode
+mode: 13, width: 1280, height: 720, pixelformat: GREY, desc: Used for ov9281 2lanes raw8 1280x720 external trigger mode
+mode: 14, width: 640, height: 400, pixelformat: GREY, desc: Used for ov9281 2lanes raw8 640x400 external trigger mode
+mode: 15, width: 320, height: 200, pixelformat: GREY, desc: Used for ov9281 2lanes raw8 320x200 external trigger mode
+mode: 16, width: 1280, height: 800, pixelformat: BA81, desc:  Used for ov9782 1 lan raw8 60fps
+mode: 17, width: 1280, height: 720, pixelformat: BA81, desc: Used for ov9782 1280x720
+mode: 18, width: 640, height: 400, pixelformat: BA81, desc: Used for ov9782 640x400
+mode: 19, width: 320, height: 200, pixelformat: BA81, desc: Used for ov9782 320x200
+mode: 20, width: 160, height: 100, pixelformat: BA81, desc: Used for ov9782 160x100
+mode: 21, width: 1280, height: 800, pixelformat: BA81, desc: Used for ov9281 2lans raw8
+mode: 22, width: 1280, height: 800, pixelformat: pBAA, desc: Used for ov9782 1280x800
+index: 0, CID: 0x00980914, desc: V4L2_CID_HFLIP, min: 0, max: 1, default: 0, current: 0
+index: 1, CID: 0x00980915, desc: V4L2_CID_VFLIP, min: 0, max: 1, default: 0, current: 0
+index: 2, CID: 0x00980911, desc: V4L2_CID_EXPOSURE, min: 1, max: 65535, default: 681, current: 32
+index: 3, CID: 0x00980913, desc: V4L2_CID_GAIN, min: 0, max: 15, default: 1, current: 8
+index: 4, CID: 0x00981901, desc: V4L2_CID_ARDUCAM_EXT_TRI, min: 0, max: 1, default: 0, current: 0
+
+
+make && ./src/camera_image_grab -c 20 -f -s ./image/ -d

@@ -1,5 +1,5 @@
 #include "device_operation.h"
-
+#include "i2cbusses.h"
 void errno_exit(const char *s)
 {
     fprintf(stderr, "%s error %d, %s\n", s, errno, strerror(errno));
@@ -317,13 +317,16 @@ void initDevice(void)
     CLEAR(fmt);
 
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE; // format of image
+    // printf("\n  force format...%d ", force_format);
     if (force_format)                       // default to 0
     {
+        printf("\n  force format... ");
         fmt.fmt.pix.width = frame_width;
         fmt.fmt.pix.height = frame_height;
 
         // fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV; // yuyv format
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24; // yuyv format
+        // fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24; // RGB format
+        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_GREY; // GREY format
         fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
 
         if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
@@ -446,6 +449,204 @@ void startCapturing(void) // make it start stream iamge data
             errno_exit("VIDIOC_STREAMON");
         break;
     }
+}
+
+
+int i2c_read(const i2c_hndl *hndl, unsigned int reg)
+{
+	struct i2c_rdwr_ioctl_data data;
+	struct i2c_msg *msgs;
+	
+	__u8 buf[sizeof(__u8) * 3] = {0};
+	int r = -1;
+
+	if (NULL == hndl || !hndl->addr)
+		return -1;
+	if (hndl->reg_width >= I2C_MAX || hndl->val_width >= I2C_MAX)
+		return -1;
+
+	if (I2C_16BIT == hndl->reg_width) {
+		buf[0] = (__u8)(reg >> 8);
+		buf[1] = (__u8)(reg & 0xFF);
+	} else if (I2C_24BIT == hndl->reg_width) {
+		buf[0] = (__u8)(reg >> 16);
+		buf[1] = (__u8)((reg >> 8) & 0xFF);
+		buf[2] = (__u8)(reg & 0xFF);
+	} else if (I2C_8BIT == hndl->reg_width)
+		buf[0] = (__u8)(reg & 0xFF);
+
+	memset(&data, 0, sizeof(data));
+	msgs = calloc(2, sizeof(struct i2c_msg));
+	if (NULL == msgs)
+		return r;
+
+	msgs[0].addr = hndl->addr >> 1;
+	msgs[0].buf = buf;
+	msgs[0].flags = 0;
+	msgs[0].len = (__u16)(hndl->reg_width + 1);
+	msgs[1].addr = hndl->addr >> 1;
+	msgs[1].flags = I2C_M_RD;
+	msgs[1].len = (__u16)(hndl->val_width + 1);
+	msgs[1].buf = buf;
+	data.msgs = msgs;
+	data.nmsgs = 2;
+
+	r = ioctl(hndl->fd, I2C_RDWR, &data);
+	free(msgs);
+	if (r < 0)
+		return r;
+
+	if (I2C_16BIT == hndl->val_width)
+		r = (buf[0] << 8) | buf[1];
+	else if (I2C_8BIT == hndl->val_width)
+		r = buf[0];
+	else if (I2C_24BIT == hndl->val_width)
+		r = (buf[0] << 16) | (buf[1]  << 8) | buf[2];
+
+	return r;
+}
+
+int i2c_write(const i2c_hndl *hndl,
+				unsigned int reg,
+				unsigned int val,
+				unsigned char check)
+{
+	struct i2c_rdwr_ioctl_data data;
+	struct i2c_msg *msgs = NULL;
+	__u8 buf[sizeof(__u8) * 6] = {0};
+	int r = -1;
+
+	if (NULL == hndl || !hndl->addr)
+		return -1;
+	if (hndl->reg_width >= I2C_MAX || hndl->val_width >= I2C_MAX)
+		return -1;
+
+	if (I2C_16BIT == hndl->reg_width) {
+		buf[0] = (__u8)(reg >> 8);
+		buf[1] = (__u8)(reg & 0xFF);
+
+		if (I2C_16BIT == hndl->val_width) {
+			buf[2] = (__u8)(val >> 8);
+			buf[3] = (__u8)(val & 0xFF);
+		} else if (I2C_24BIT == hndl->val_width) {
+			buf[2] = (__u8)(val >> 16);
+			buf[3] = (__u8)((val >> 8) & 0xFF);
+			buf[4] = (__u8)(val & 0xFF);
+		} else if (I2C_8BIT == hndl->val_width)
+			buf[2] = (__u8)(val & 0xFF);
+	} else if (I2C_8BIT == hndl->reg_width) {
+		buf[0] = (__u8)(reg & 0xFF);
+
+		if (I2C_16BIT == hndl->val_width) {
+			buf[1] = (__u8)(val >> 8);
+			buf[2] = (__u8)(val & 0xFF);
+		} else if (I2C_24BIT == hndl->val_width) {
+			buf[1] = (__u8)(val >> 16);
+			buf[2] = (__u8)((val >> 8) & 0xFF);
+			buf[3] = (__u8)(val & 0xFF);
+		} else if (I2C_8BIT == hndl->val_width)
+			buf[1] = (__u8)(val & 0xFF);
+	} else if (I2C_24BIT == hndl->reg_width) {
+		buf[0] = (__u8)(reg >> 16);
+		buf[1] = (__u8)((reg >> 8) & 0xFF);
+		buf[2] = (__u8)(val & 0xFF);
+
+		if (I2C_16BIT == hndl->val_width) {
+			buf[3] = (__u8)(val >> 8);
+			buf[4] = (__u8)(val & 0xFF);
+		} else if (I2C_24BIT == hndl->val_width) {
+			buf[3] = (__u8)(val >> 16);
+			buf[4] = (__u8)((val >> 8) & 0xFF);
+			buf[5] = (__u8)(val & 0xFF);
+		} else if (I2C_8BIT == hndl->val_width)
+			buf[3] = (__u8)(val & 0xFF);
+	}
+
+	memset(&data, 0, sizeof(data));
+	msgs = calloc(2, sizeof(struct i2c_msg));
+	if (NULL == msgs)
+		return r;
+
+	msgs[0].addr = hndl->addr >> 1;
+	msgs[0].buf = buf;
+	msgs[0].flags = 0;
+	msgs[0].len = (__u16)(hndl->reg_width + 1 + hndl->val_width + 1);
+	data.msgs = msgs;
+	data.nmsgs = 1;
+
+	r = ioctl(hndl->fd, I2C_RDWR, &data);
+	free(msgs);
+	if (r < 0)
+		return r;
+
+	if (check)
+		return !(i2c_read(hndl, reg) == (int)val);
+
+	return 0;
+}
+
+
+void setRegExtMode(void)
+{
+
+    i2c_main();
+
+    // int file;
+    // int adapter_nr = 11;
+    // char filename[20];
+
+    // int addr = 0x60;
+    // char adapter_nr_str[5];
+    // int count_regs;
+    // struct reg {
+    //     unsigned short int address;
+    //     unsigned short int value;
+    //     };
+
+    // struct reg regs[] = {
+    //     {0x4F00, 0x01},
+    //     {0x3030, 0x04},
+    //     {0x303F, 0x01},
+    //     {0x302C, 0x00},
+    //     {0x302F, 0x7F},
+    //     {0x3823, 0x30},
+    //     {0x0100, 0x00}
+    //     };
+
+    // const int regs_size = sizeof(regs) / sizeof(regs[0]);
+
+    // snprintf(adapter_nr_str, 5,"%d", adapter_nr);
+    // adapter_nr = lookup_i2c_bus(adapter_nr_str);
+
+    // file = open_i2c_dev(adapter_nr, filename, sizeof(filename), 0);
+    // printf("file name is %s \n", filename);
+
+    // if(file < 0){
+    //     printf("file = open(filename, O_RDWR); Error no.%d: %s\n", errno, strerror(errno));
+    //     exit(1);
+    // }
+
+    // if(ioctl(file, I2C_SLAVE_FORCE, addr) < 0){
+    //     printf("(ioctl(file, I2C_SLAVE, addr) < 0); Error no.%d: %s\n", errno, strerror(errno));
+    //     exit(1);
+    // }
+
+    
+    // // first lets try to read the register.
+    // struct i2c_hndl reg2val1;
+    // reg2val1.fd = file;
+    // reg2val1.addr = addr;
+    // reg2val1.reg_width = I2C_16BIT;
+    // reg2val1.val_width = I2C_8BIT;
+    // printf("data register read as : %d \n", i2c_read(&reg2val1, 0x302f));
+
+    // // for(count_regs = 0; count_regs < regs_size; count_regs ++)
+    // // {
+        
+    // //     if (-1 == xioctl(fd, VIDIOC_REQBUFS, &req)) //
+    // //         printf("");
+
+    // // }
 }
 
 void stopCapturing(void) // stop the driver from streaming data

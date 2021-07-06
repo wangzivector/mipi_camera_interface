@@ -5,10 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
-#include <getopt.h> /* getopt_long() */
-
-#include <fcntl.h> /* low-level i/o */
+#include <getopt.h> 
+#include <fcntl.h> 
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -47,8 +45,8 @@ extern int frame_width;
 extern int frame_height;
 extern int frame_count;
 
-extern int save_iamge_enable;
-
+extern int save_image_enable;
+extern int show_image_enable;
 extern char *save_folder;
 extern char *dev_name;
 
