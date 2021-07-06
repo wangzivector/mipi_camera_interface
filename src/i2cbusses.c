@@ -26,378 +26,8 @@
 #define _BSD_SOURCE 1 /* for glibc <= 2.19 */
 #define _DEFAULT_SOURCE 1 /* for glibc >= 2.19 */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/param.h>	/* for NAME_MAX */
-#include <sys/ioctl.h>
-#include <string.h>
-#include <strings.h>	/* for strcasecmp() */
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <limits.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <errno.h>
 #include "i2cbusses.h"
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
 
-enum adt { adt_dummy, adt_isa, adt_i2c, adt_smbus, adt_unknown };
-
-struct adap_type {
-	const char *funcs;
-	const char* algo;
-};
-
-static struct adap_type adap_types[5] = {
-	{ .funcs	= "dummy",
-	  .algo		= "Dummy bus", },
-	{ .funcs	= "isa",
-	  .algo		= "ISA bus", },
-	{ .funcs	= "i2c",
-	  .algo		= "I2C adapter", },
-	{ .funcs	= "smbus",
-	  .algo		= "SMBus adapter", },
-	{ .funcs	= "unknown",
-	  .algo		= "N/A", },
-};
-
-static enum adt i2c_get_funcs(int i2cbus)
-{
-	unsigned long funcs;
-	int file;
-	char filename[20];
-	enum adt ret;
-
-	file = open_i2c_dev(i2cbus, filename, sizeof(filename), 1);
-	if (file < 0)
-		return adt_unknown;
-
-	if (ioctl(file, I2C_FUNCS, &funcs) < 0)
-		ret = adt_unknown;
-	else if (funcs & I2C_FUNC_I2C)
-		ret = adt_i2c;
-	else if (funcs & (I2C_FUNC_SMBUS_BYTE |
-			  I2C_FUNC_SMBUS_BYTE_DATA |
-			  I2C_FUNC_SMBUS_WORD_DATA))
-		ret = adt_smbus;
-	else
-		ret = adt_dummy;
-
-	close(file);
-	return ret;
-}
-
-/* Remove trailing spaces from a string
-   Return the new string length including the trailing NUL */
-static int rtrim(char *s)
-{
-	int i;
-
-	for (i = strlen(s) - 1; i >= 0 && (s[i] == ' ' || s[i] == '\n'); i--)
-		s[i] = '\0';
-	return i + 2;
-}
-
-void free_adapters(struct i2c_adap *adapters)
-{
-	int i;
-
-	for (i = 0; adapters[i].name; i++)
-		free(adapters[i].name);
-	free(adapters);
-}
-
-/* We allocate space for the adapters in bunches. The last item is a
-   terminator, so here we start with room for 7 adapters, which should
-   be enough in most cases. If not, we allocate more later as needed. */
-#define BUNCH	8
-
-/* n must match the size of adapters at calling time */
-static struct i2c_adap *more_adapters(struct i2c_adap *adapters, int n)
-{
-	struct i2c_adap *new_adapters;
-
-	new_adapters = realloc(adapters, (n + BUNCH) * sizeof(struct i2c_adap));
-	if (!new_adapters) {
-		free_adapters(adapters);
-		return NULL;
-	}
-	memset(new_adapters + n, 0, BUNCH * sizeof(struct i2c_adap));
-
-	return new_adapters;
-}
-
-struct i2c_adap *gather_i2c_busses(void)
-{
-	char s[120];
-	struct dirent *de, *dde;
-	DIR *dir, *ddir;
-	FILE *f;
-	char fstype[NAME_MAX], sysfs[NAME_MAX], n[NAME_MAX];
-	int foundsysfs = 0;
-	int len, count = 0;
-	struct i2c_adap *adapters;
-
-	adapters = calloc(BUNCH, sizeof(struct i2c_adap));
-	if (!adapters)
-		return NULL;
-
-	/* look in /proc/bus/i2c */
-	if ((f = fopen("/proc/bus/i2c", "r"))) {
-		while (fgets(s, 120, f)) {
-			char *algo, *name, *type, *all;
-			int len_algo, len_name, len_type;
-			int i2cbus;
-
-			algo = strrchr(s, '\t');
-			*(algo++) = '\0';
-			len_algo = rtrim(algo);
-
-			name = strrchr(s, '\t');
-			*(name++) = '\0';
-			len_name = rtrim(name);
-
-			type = strrchr(s, '\t');
-			*(type++) = '\0';
-			len_type = rtrim(type);
-
-			sscanf(s, "i2c-%d", &i2cbus);
-
-			if ((count + 1) % BUNCH == 0) {
-				/* We need more space */
-				adapters = more_adapters(adapters, count + 1);
-				if (!adapters)
-					return NULL;
-			}
-
-			all = malloc(len_name + len_type + len_algo);
-			if (all == NULL) {
-				free_adapters(adapters);
-				return NULL;
-			}
-			adapters[count].nr = i2cbus;
-			adapters[count].name = strcpy(all, name);
-			adapters[count].funcs = strcpy(all + len_name, type);
-			adapters[count].algo = strcpy(all + len_name + len_type,
-						      algo);
-			count++;
-		}
-		fclose(f);
-		goto done;
-	}
-
-	/* look in sysfs */
-	/* First figure out where sysfs was mounted */
-	if ((f = fopen("/proc/mounts", "r")) == NULL) {
-		goto done;
-	}
-	while (fgets(n, NAME_MAX, f)) {
-		sscanf(n, "%*[^ ] %[^ ] %[^ ] %*s\n", sysfs, fstype);
-		if (strcasecmp(fstype, "sysfs") == 0) {
-			foundsysfs++;
-			break;
-		}
-	}
-	fclose(f);
-	if (! foundsysfs) {
-		goto done;
-	}
-
-	/* Bus numbers in i2c-adapter don't necessarily match those in
-	   i2c-dev and what we really care about are the i2c-dev numbers.
-	   Unfortunately the names are harder to get in i2c-dev */
-	strcat(sysfs, "/class/i2c-dev");
-	if(!(dir = opendir(sysfs)))
-		goto done;
-	/* go through the busses */
-	while ((de = readdir(dir)) != NULL) {
-		if (!strcmp(de->d_name, "."))
-			continue;
-		if (!strcmp(de->d_name, ".."))
-			continue;
-
-		/* this should work for kernels 2.6.5 or higher and */
-		/* is preferred because is unambiguous */
-		len = snprintf(n, NAME_MAX, "%s/%s/name", sysfs, de->d_name);
-		if (len >= NAME_MAX) {
-			fprintf(stderr, "%s: path truncated\n", n);
-			continue;
-		}
-		f = fopen(n, "r");
-		/* this seems to work for ISA */
-		if(f == NULL) {
-			len = snprintf(n, NAME_MAX, "%s/%s/device/name", sysfs,
-				       de->d_name);
-			if (len >= NAME_MAX) {
-				fprintf(stderr, "%s: path truncated\n", n);
-				continue;
-			}
-			f = fopen(n, "r");
-		}
-		/* non-ISA is much harder */
-		/* and this won't find the correct bus name if a driver
-		   has more than one bus */
-		if(f == NULL) {
-			len = snprintf(n, NAME_MAX, "%s/%s/device", sysfs,
-				       de->d_name);
-			if (len >= NAME_MAX) {
-				fprintf(stderr, "%s: path truncated\n", n);
-				continue;
-			}
-			if(!(ddir = opendir(n)))
-				continue;
-			while ((dde = readdir(ddir)) != NULL) {
-				if (!strcmp(dde->d_name, "."))
-					continue;
-				if (!strcmp(dde->d_name, ".."))
-					continue;
-				if ((!strncmp(dde->d_name, "i2c-", 4))) {
-					len = snprintf(n, NAME_MAX,
-						       "%s/%s/device/%s/name",
-						       sysfs, de->d_name,
-						       dde->d_name);
-					if (len >= NAME_MAX) {
-						fprintf(stderr,
-							"%s: path truncated\n",
-							n);
-						continue;
-					}
-					if((f = fopen(n, "r")))
-						goto found;
-				}
-			}
-		}
-
-found:
-		if (f != NULL) {
-			int i2cbus;
-			enum adt type;
-			char *px;
-
-			px = fgets(s, 120, f);
-			fclose(f);
-			if (!px) {
-				fprintf(stderr, "%s: read error\n", n);
-				continue;
-			}
-			if ((px = strchr(s, '\n')) != NULL)
-				*px = 0;
-			if (!sscanf(de->d_name, "i2c-%d", &i2cbus))
-				continue;
-			if (!strncmp(s, "ISA ", 4)) {
-				type = adt_isa;
-			} else {
-				/* Attempt to probe for adapter capabilities */
-				type = i2c_get_funcs(i2cbus);
-			}
-
-			if ((count + 1) % BUNCH == 0) {
-				/* We need more space */
-				adapters = more_adapters(adapters, count + 1);
-				if (!adapters)
-					return NULL;
-			}
-
-			adapters[count].nr = i2cbus;
-			adapters[count].name = strdup(s);
-			if (adapters[count].name == NULL) {
-				free_adapters(adapters);
-				return NULL;
-			}
-			adapters[count].funcs = adap_types[type].funcs;
-			adapters[count].algo = adap_types[type].algo;
-			count++;
-		}
-	}
-	closedir(dir);
-
-done:
-	return adapters;
-}
-
-static int lookup_i2c_bus_by_name(const char *bus_name)
-{
-	struct i2c_adap *adapters;
-	int i, i2cbus = -1;
-
-	adapters = gather_i2c_busses();
-	if (adapters == NULL) {
-		fprintf(stderr, "Error: Out of memory!\n");
-		return -3;
-	}
-
-	/* Walk the list of i2c busses, looking for the one with the
-	   right name */
-	for (i = 0; adapters[i].name; i++) {
-		if (strcmp(adapters[i].name, bus_name) == 0) {
-			if (i2cbus >= 0) {
-				fprintf(stderr,
-					"Error: I2C bus name is not unique!\n");
-				i2cbus = -4;
-				goto done;
-			}
-			i2cbus = adapters[i].nr;
-		}
-	}
-
-	if (i2cbus == -1)
-		fprintf(stderr, "Error: I2C bus name doesn't match any "
-			"bus present!\n");
-
-done:
-	free_adapters(adapters);
-	return i2cbus;
-}
-
-/*
- * Parse an I2CBUS command line argument and return the corresponding
- * bus number, or a negative value if the bus is invalid.
- */
-int lookup_i2c_bus(const char *i2cbus_arg)
-{
-	unsigned long i2cbus;
-	char *end;
-
-	i2cbus = strtoul(i2cbus_arg, &end, 0);
-	if (*end || !*i2cbus_arg) {
-		/* Not a number, maybe a name? */
-		return lookup_i2c_bus_by_name(i2cbus_arg);
-	}
-	if (i2cbus > 0xFFFFF) {
-		fprintf(stderr, "Error: I2C bus out of range!\n");
-		return -2;
-	}
-
-	return i2cbus;
-}
-
-/*
- * Parse a CHIP-ADDRESS command line argument and return the corresponding
- * chip address, or a negative value if the address is invalid.
- */
-int parse_i2c_address(const char *address_arg)
-{
-	long address;
-	char *end;
-	long min_addr = 0x08;
-	long max_addr = 0x77;
-
-	address = strtol(address_arg, &end, 0);
-	if (*end || !*address_arg) {
-		fprintf(stderr, "Error: Chip address is not a number!\n");
-		return -1;
-	}
-
-	if (address < min_addr || address > max_addr) {
-		fprintf(stderr, "Error: Chip address out of range "
-			"(0x%02lx-0x%02lx)!\n", min_addr, max_addr);
-		return -2;
-	}
-
-	return address;
-}
 
 int open_i2c_dev(int i2cbus, char *filename, size_t size, int quiet)
 {
@@ -447,4 +77,264 @@ int set_slave_addr(int file, int address, int force)
 	}
 
 	return 0;
+}
+
+static int check_funcs(int file)
+{
+	unsigned long funcs;
+
+	/* check adapter functionality */
+	if (ioctl(file, I2C_FUNCS, &funcs) < 0) {
+		fprintf(stderr, "Error: Could not get the adapter "
+			"functionality matrix: %s\n", strerror(errno));
+		return -1;
+	}
+
+	if (!(funcs & I2C_FUNC_I2C)) {
+		fprintf(stderr, MISSING_FUNC_FMT, "I2C transfers");
+		return -1;
+	}
+
+	return 0;
+}
+
+static void print_msgs(struct i2c_msg *msgs, __u32 nmsgs, unsigned flags)
+{
+	FILE *output = flags & PRINT_STDERR ? stderr : stdout;
+	unsigned i;
+	__u16 j;
+
+	for (i = 0; i < nmsgs; i++) {
+		int read = msgs[i].flags & I2C_M_RD;
+		int recv_len = msgs[i].flags & I2C_M_RECV_LEN;
+		int print_buf = (read && (flags & PRINT_READ_BUF)) ||
+				(!read && (flags & PRINT_WRITE_BUF));
+		__u16 len = msgs[i].len;
+
+		if (recv_len && print_buf && len != msgs[i].buf[0] + 1) {
+			fprintf(stderr, "Correcting wrong msg length after recv_len! Please fix the I2C driver and/or report.\n");
+			len = msgs[i].buf[0] + 1;
+		}
+
+		if (flags & PRINT_HEADER) {
+			fprintf(output, "msg %u: addr 0x%02x, %s, len ",
+				i, msgs[i].addr, read ? "read" : "write");
+			if (!recv_len || flags & PRINT_READ_BUF)
+				fprintf(output, "%u", len);
+			else
+				fprintf(output, "TBD");
+		}
+
+		if (len && print_buf) {
+			if (flags & PRINT_HEADER)
+				fprintf(output, ", buf ");
+			for (j = 0; j < len - 1; j++)
+				fprintf(output, "0x%02x ", msgs[i].buf[j]);
+			/* Print final byte with newline */
+			fprintf(output, "0x%02x\n", msgs[i].buf[j]);
+		} else if (flags & PRINT_HEADER) {
+			fprintf(output, "\n");
+		}
+	}
+}
+
+
+int i2c_main()
+{
+	
+	char argv[][8] = { {"w2@0x60"}, {"0x30"}, {"0x30"}, {"r1"}};
+	
+    int argc = 4;
+	char filename[20];
+	int i2cbus = 11;
+	int address = 0x60;
+	int file;
+	int arg_idx = 0;
+	int nmsgs = 0;
+	int nmsgs_sent;
+	int i, j;
+
+	int force = 1;
+	int yes = 1;
+
+	struct reg regs[] = {
+		{0x4F00, 0x01},
+		{0x3030, 0x04},
+		{0x303F, 0x01},
+		{0x302C, 0x00},
+		{0x302F, 0x7F},
+		{0x3823, 0x30},
+		{0x0100, 0x00},
+	};
+	
+	struct i2c_msg msgs[I2C_RDRW_IOCTL_MAX_MSGS]; // create sending messsage
+	enum parse_state state = PARSE_GET_DESC; // sending mode
+	unsigned buf_idx = 0;
+
+	for (i = 0; i < I2C_RDRW_IOCTL_MAX_MSGS; i++) // clean msgs buffer
+		msgs[i].buf = NULL;
+
+	file = open_i2c_dev(i2cbus, filename, sizeof(filename), 0); // open device
+	if (file < 0 || check_funcs(file)) // check device is iic-related device 
+		exit(1);
+
+	while (arg_idx < argc) { // read every send mission
+		char *arg_ptr = argv[arg_idx]; // take out the arg_idx_th string 
+		unsigned long len, raw_data;
+		unsigned short int flags;
+		unsigned char data, *buf;
+		char *end;
+		if (nmsgs > I2C_RDRW_IOCTL_MAX_MSGS) { // check the number
+			fprintf(stderr, "Error: Too many messages (max: %d)\n",
+				I2C_RDRW_IOCTL_MAX_MSGS);
+			goto err_out;
+		}
+
+		switch (state) { // to know w/r and its bus address
+		case PARSE_GET_DESC:
+			flags = 0;
+			switch (*arg_ptr++) {
+			case 'r': flags |= I2C_M_RD; break; // flag == read mode
+			case 'w': break;					// flag != read mode
+			default:
+				fprintf(stderr, "Error: Invalid direction\n");
+				goto err_out_with_arg;
+			}
+
+			len = strtoul(arg_ptr, &end, 0); // num of operating bytes
+			if (len > 0xffff || arg_ptr == end) {
+				fprintf(stderr, "Error: Length invalid\n");
+				goto err_out_with_arg;
+			}
+			arg_ptr = end;
+			arg_ptr++; // '@'
+
+			/* Ensure address is not busy */
+			// this line should be put in ahead===================...
+			if (!force && set_slave_addr(file, address, 0)) // this is important for iic, slave force mode
+				goto err_out_with_arg;
+
+			msgs[nmsgs].addr = address; // address, always the same
+			msgs[nmsgs].flags = flags; // default writing mode
+			msgs[nmsgs].len = len;    // num of operating bytes
+
+			if (len) {
+				buf = malloc(len); // create buffer for writer buffer
+				if (!buf) {
+					fprintf(stderr, "Error: No memory for buffer\n");
+					goto err_out_with_arg;
+				}
+
+				memset(buf, 0, len);
+				msgs[nmsgs].buf = buf; // clear the buffer (write) nmsgs is the msg index
+
+				// i2c_m_recv_len means the message is from the slave
+				// we must ensure the buffer will be large enough to cope with 
+				// a message length of I2C_SMBUS_BLOCK_MAX as this is the maximum underlying 
+				// bus driver allow. the first byte in the buffer must be at least one to hold the 
+				// message length, but can be greater. 
+				/// wait to understand, I think can be erased.
+				if (flags & I2C_M_RECV_LEN)
+					buf[0] = 1; /* number of extra bytes */ // like the params  'r1'
+			}
+
+			if (flags & I2C_M_RD || len == 0) { // read mode,// or read mode and len is undefine
+				nmsgs++; // if is read mode, which means the head of string is 'r', then turn to next buffer, why 
+			} else { // write mode, 
+				buf_idx = 0;
+				state = PARSE_GET_DATA;
+			}
+			// return while loop, from here, you got the targeted data address.
+			break;
+
+		case PARSE_GET_DATA:
+			raw_data = strtoul(arg_ptr, &end, 0); // get the data register
+			if (raw_data > 0xff || arg_ptr == end) {
+				fprintf(stderr, "Error: Invalid data byte\n");
+				goto err_out_with_arg;
+			}
+			data = raw_data;
+			len = msgs[nmsgs].len;
+
+			while (buf_idx < len) {
+				msgs[nmsgs].buf[buf_idx++] = data;
+
+				if (!*end)
+					break;
+
+				switch (*end) {
+				/* Pseudo randomness (8 bit AXR with a=13 and b=27) */
+				case 'p':
+					data = (data ^ 27) + 13;
+					data = (data << 1) | (data >> 7);
+					break;
+				case '+': data++; break;
+				case '-': data--; break;
+				case '=': break;
+				default:
+					fprintf(stderr, "Error: Invalid data byte suffix\n");
+					goto err_out_with_arg;
+				}
+			}
+
+			if (buf_idx == len) {
+				nmsgs++;
+				state = PARSE_GET_DESC;
+			}
+
+			break;
+
+		default:
+			/* Should never happen */
+			fprintf(stderr, "Internal Error: Unknown state in state machine!\n");
+			goto err_out;
+		}
+		arg_idx++;
+	}
+
+	if (state != PARSE_GET_DESC || nmsgs == 0) {
+		fprintf(stderr, "Error: Incomplete message\n");
+		goto err_out;
+	}
+
+	if (yes) {
+		struct i2c_rdwr_ioctl_data rdwr;
+
+		for(i = 0; i< nmsgs; i++ ){
+			printf("\n ------- %d msg : ", i);
+			printf("addr:%4x   ", msgs[i].addr);
+			printf("flags:%4x   ", msgs[i].flags);
+			printf("buflen:%d   ", msgs[i].len);
+			for(j = 0; j< msgs[i].len; j ++)
+				printf("| 0x%2x ", msgs[i].buf[j]);
+			printf("\n \n ");
+		}
+
+
+		rdwr.msgs = msgs;
+		rdwr.nmsgs = nmsgs;
+		nmsgs_sent = ioctl(file, I2C_RDWR, &rdwr);
+		if (nmsgs_sent < 0) {
+			fprintf(stderr, "Error: Sending messages failed: %s\n", strerror(errno));
+			goto err_out;
+		} 
+		print_msgs(msgs, nmsgs_sent, PRINT_READ_BUF | (1 ? PRINT_HEADER | PRINT_WRITE_BUF : 0));
+	}
+
+	close(file);
+
+	for (i = 0; i < nmsgs; i++)
+		free(msgs[i].buf);
+
+	exit(0);
+
+ err_out_with_arg:
+	fprintf(stderr, "Error: faulty argument is '%s'\n", argv[arg_idx]);
+ err_out:
+	close(file);
+
+	for (i = 0; i <= nmsgs; i++)
+		free(msgs[i].buf);
+
+	exit(1);
 }

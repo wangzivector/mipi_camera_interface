@@ -23,7 +23,13 @@
 #define _I2CBUSSES_H
 
 #include <unistd.h>
-
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>	/* for NAME_MAX */
+#include <strings.h>	/* for strcasecmp() */
+#include <limits.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <string.h>
@@ -32,14 +38,18 @@
 #include <unistd.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
-#include "i2cbusses.h"
-// #include "util.h"
-// #include "../version.h"
+
 
 enum parse_state {
 	PARSE_GET_DESC,
 	PARSE_GET_DATA,
 };
+
+struct reg {
+    unsigned short int address;
+    unsigned short int value;
+};
+
 
 #define PRINT_STDERR	(1 << 0)
 #define PRINT_READ_BUF	(1 << 1)
@@ -47,24 +57,9 @@ enum parse_state {
 #define PRINT_HEADER	(1 << 3)
 
 
-struct i2c_adap {
-	int nr;
-	char *name;
-	const char *funcs;
-	const char *algo;
-};
-
-struct i2c_adap *gather_i2c_busses(void);
-void free_adapters(struct i2c_adap *adapters);
-
-int lookup_i2c_bus(const char *i2cbus_arg);
-int parse_i2c_address(const char *address_arg);
 int open_i2c_dev(int i2cbus, char *filename, size_t size, int quiet);
 int set_slave_addr(int file, int address, int force);
-
 int i2c_main(void);
-
-
 
 #define MISSING_FUNC_FMT	"Error: Adapter does not have %s capability\n"
 
