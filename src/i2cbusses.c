@@ -138,198 +138,165 @@ static void print_msgs(struct i2c_msg *msgs, __u32 nmsgs, unsigned flags)
 	}
 }
 
-
-int i2c_main()
+int i2cReadWrite(struct reg regs[], int n_reg, enum i2c_dir dir)
 {
-	
-	char argv[][8] = { {"w2@0x60"}, {"0x30"}, {"0x30"}, {"r1"}};
-	
-    int argc = 4;
-	char filename[20];
-	int i2cbus = 11;
-	int address = 0x60;
-	int file;
-	int arg_idx = 0;
-	int nmsgs = 0;
-	int nmsgs_sent;
 	int i, j;
+	char filename[20];
+	int file, i2cbus = 11;
+	int nmsgs_sent, size_allmsgs, nmsgs = 0;
+	unsigned char bus_address = 0x60;
+	unsigned short int data, flags = 0;
+	unsigned char *buf;
 
-	int force = 1;
-	int yes = 1;
-
-	struct reg regs[] = {
-		{0x4F00, 0x01},
-		{0x3030, 0x04},
-		{0x303F, 0x01},
-		{0x302C, 0x00},
-		{0x302F, 0x7F},
-		{0x3823, 0x30},
-		{0x0100, 0x00},
-	};
+	// int force = 1;
 	
-	struct i2c_msg msgs[I2C_RDRW_IOCTL_MAX_MSGS]; // create sending messsage
-	enum parse_state state = PARSE_GET_DESC; // sending mode
-	unsigned buf_idx = 0;
+	bus_address = 0x60;
+
+	struct i2c_msg msgs[2], all_msgs[I2C_RDRW_IOCTL_MAX_MSGS]; // create sending messsage
+	// enum parse_state state = PARSE_GET_DESC; // sending mode
 
 	for (i = 0; i < I2C_RDRW_IOCTL_MAX_MSGS; i++) // clean msgs buffer
-		msgs[i].buf = NULL;
+		all_msgs[i].buf = NULL;
 
 	file = open_i2c_dev(i2cbus, filename, sizeof(filename), 0); // open device
 	if (file < 0 || check_funcs(file)) // check device is iic-related device 
 		exit(1);
+	
+	// n_reg = sizeof(regs)/sizeof(struct reg);
+	printf("   num of regs to read: %d\n", n_reg);
 
-	while (arg_idx < argc) { // read every send mission
-		char *arg_ptr = argv[arg_idx]; // take out the arg_idx_th string 
-		unsigned long len, raw_data;
-		unsigned short int flags;
-		unsigned char data, *buf;
-		char *end;
-		if (nmsgs > I2C_RDRW_IOCTL_MAX_MSGS) { // check the number
-			fprintf(stderr, "Error: Too many messages (max: %d)\n",
-				I2C_RDRW_IOCTL_MAX_MSGS);
-			goto err_out;
-		}
-
-		switch (state) { // to know w/r and its bus address
-		case PARSE_GET_DESC:
-			flags = 0;
-			switch (*arg_ptr++) {
-			case 'r': flags |= I2C_M_RD; break; // flag == read mode
-			case 'w': break;					// flag != read mode
-			default:
-				fprintf(stderr, "Error: Invalid direction\n");
-				goto err_out_with_arg;
-			}
-
-			len = strtoul(arg_ptr, &end, 0); // num of operating bytes
-			if (len > 0xffff || arg_ptr == end) {
-				fprintf(stderr, "Error: Length invalid\n");
-				goto err_out_with_arg;
-			}
-			arg_ptr = end;
-			arg_ptr++; // '@'
-
-			/* Ensure address is not busy */
-			// this line should be put in ahead===================...
-			if (!force && set_slave_addr(file, address, 0)) // this is important for iic, slave force mode
-				goto err_out_with_arg;
-
-			msgs[nmsgs].addr = address; // address, always the same
-			msgs[nmsgs].flags = flags; // default writing mode
-			msgs[nmsgs].len = len;    // num of operating bytes
-
-			if (len) {
-				buf = malloc(len); // create buffer for writer buffer
-				if (!buf) {
-					fprintf(stderr, "Error: No memory for buffer\n");
-					goto err_out_with_arg;
+	// read buffer setting
+	for(i = 0; i < n_reg; i ++)
+	{
+		switch (dir){
+			case I2C_READ_MODE :
+				size_allmsgs = 2*n_reg;
+				all_msgs[i*2].addr = bus_address; // address, always the same
+				all_msgs[i*2].flags = flags; // default writing mode
+				all_msgs[i*2].len = 2;    // num of operating bytes
+				if (all_msgs[i*2].len) {
+					buf = malloc(all_msgs[i*2].len); // create buffer for writer buffer
+					if (!buf) {
+						fprintf(stderr, "Error: No memory for buffer\n");
+						goto err_out_with_arg;
+					}
 				}
+				memset(buf, 0, all_msgs[i*2].len);
+				all_msgs[i*2].buf = buf; // clear the buffer (write) nall_msgs is the msg index
+				data = regs[i].address;
+				all_msgs[i*2].buf[0] = data >> 8;
+				all_msgs[i*2].buf[1] = data & 0x00ff;
 
-				memset(buf, 0, len);
-				msgs[nmsgs].buf = buf; // clear the buffer (write) nmsgs is the msg index
+				all_msgs[i*2 + 1].addr = bus_address; // address, always the same
+				all_msgs[i*2 + 1].flags = flags|I2C_M_RD;; // default writing mode
+				all_msgs[i*2 + 1].len = 1;    // num of operating bytes
+				if (all_msgs[i*2 + 1].len) {
+					buf = malloc(all_msgs[i*2 + 1].len); // create buffer for writer buffer
+					if (!buf) {
+						fprintf(stderr, "Error: No memory for buffer\n");
+						goto err_out_with_arg;
+					}
+				}
+				memset(buf, 0, all_msgs[i*2 + 1].len);
+				all_msgs[i*2 + 1].buf = buf; // clear the buffer (write) nall_msgs is the msg index
+				all_msgs[i*2 + 1].buf[0] = 0x00;
+				break;
 
-				// i2c_m_recv_len means the message is from the slave
-				// we must ensure the buffer will be large enough to cope with 
-				// a message length of I2C_SMBUS_BLOCK_MAX as this is the maximum underlying 
-				// bus driver allow. the first byte in the buffer must be at least one to hold the 
-				// message length, but can be greater. 
-				/// wait to understand, I think can be erased.
-				if (flags & I2C_M_RECV_LEN)
-					buf[0] = 1; /* number of extra bytes */ // like the params  'r1'
-			}
-
-			if (flags & I2C_M_RD || len == 0) { // read mode,// or read mode and len is undefine
-				nmsgs++; // if is read mode, which means the head of string is 'r', then turn to next buffer, why 
-			} else { // write mode, 
-				buf_idx = 0;
-				state = PARSE_GET_DATA;
-			}
-			// return while loop, from here, you got the targeted data address.
+			case I2C_WRITE_MODE :
+				size_allmsgs = n_reg;
+				all_msgs[i].addr = bus_address; // address, always the same
+				all_msgs[i].flags = flags; // default writing mode
+				all_msgs[i].len = 3;    // num of operating bytes
+				if (all_msgs[i].len) {
+					buf = malloc(all_msgs[i].len); // create buffer for writer buffer
+					if (!buf) {
+						fprintf(stderr, "Error: No memory for buffer\n");
+						goto err_out_with_arg;
+					}
+				}
+				memset(buf, 0, all_msgs[i].len);
+				all_msgs[i].buf = buf; // clear the buffer (write) nall_msgs is the msg index
+				data = regs[i].address;
+				all_msgs[i].buf[0] = data >> 8;
+				all_msgs[i].buf[1] = data & 0x00ff;
+				data = regs[i].value;
+				all_msgs[i].buf[2] = data;
 			break;
 
-		case PARSE_GET_DATA:
-			raw_data = strtoul(arg_ptr, &end, 0); // get the data register
-			if (raw_data > 0xff || arg_ptr == end) {
-				fprintf(stderr, "Error: Invalid data byte\n");
-				goto err_out_with_arg;
+			default :
+				fprintf(stderr, "Error: wrong mode %s\n");
+				goto err_out;
+		}
+	}
+
+	struct i2c_rdwr_ioctl_data rdwr;
+
+	/* Ensure address is not busy */
+	// this line should be put in ahead===================...
+	// if (!force && set_slave_addr(file, bus_address, 0)) // this is important for iic, slave force mode
+	// 	goto err_out_with_arg;
+
+	// for(i = 0; i< size_allmsgs; i++ ){
+	// 	printf("\n ------- %d msg : ", i);
+	// 	printf("addr: 0x%02x   ", all_msgs[i].addr);
+	// 	printf("flags: %s   ", all_msgs[i].flags ? "read": "write");
+	// 	printf("buflen: %d   ", all_msgs[i].len);
+	// 	for(j = 0; j< all_msgs[i].len; j ++)
+	// 		printf("| 0x%2x ", all_msgs[i].buf[j]);
+	// }
+	// printf("\n\n");
+
+	switch (dir) {
+		case I2C_READ_MODE :
+			for(j = 0; j < n_reg; j++)
+			{
+				msgs[0] = all_msgs[j*2];
+				msgs[1] = all_msgs[j*2 + 1];
+				nmsgs = 2;
+				rdwr.msgs = msgs;
+				rdwr.nmsgs = nmsgs;
+				nmsgs_sent = ioctl(file, I2C_RDWR, &rdwr);
+
+				if (nmsgs_sent < 0) {
+					fprintf(stderr, "Error: Sending messages failed: %s\n", strerror(errno));
+					goto err_out;
+				} 
+				print_msgs(msgs, nmsgs_sent, PRINT_READ_BUF | (1 ? PRINT_HEADER | PRINT_WRITE_BUF : 0));
 			}
-			data = raw_data;
-			len = msgs[nmsgs].len;
-
-			while (buf_idx < len) {
-				msgs[nmsgs].buf[buf_idx++] = data;
-
-				if (!*end)
-					break;
-
-				switch (*end) {
-				/* Pseudo randomness (8 bit AXR with a=13 and b=27) */
-				case 'p':
-					data = (data ^ 27) + 13;
-					data = (data << 1) | (data >> 7);
-					break;
-				case '+': data++; break;
-				case '-': data--; break;
-				case '=': break;
-				default:
-					fprintf(stderr, "Error: Invalid data byte suffix\n");
-					goto err_out_with_arg;
-				}
-			}
-
-			if (buf_idx == len) {
-				nmsgs++;
-				state = PARSE_GET_DESC;
-			}
-
 			break;
 
-		default:
-			/* Should never happen */
-			fprintf(stderr, "Internal Error: Unknown state in state machine!\n");
+		case I2C_WRITE_MODE :
+		for(j = 0; j < n_reg; j++)
+			{
+				msgs[0] = all_msgs[j];
+				nmsgs = 1;
+				rdwr.msgs = msgs;
+				rdwr.nmsgs = nmsgs;
+				nmsgs_sent = ioctl(file, I2C_RDWR, &rdwr);
+
+				if (nmsgs_sent < 0) {
+					fprintf(stderr, "Error: Sending messages failed: %s\n", strerror(errno));
+					goto err_out;
+				} 
+				print_msgs(msgs, nmsgs_sent, PRINT_READ_BUF | (1 ? PRINT_HEADER | PRINT_WRITE_BUF : 0));
+			}
+		break;
+
+		default :
+			fprintf(stderr, "Error: wrong mode %s\n");
 			goto err_out;
-		}
-		arg_idx++;
-	}
-
-	if (state != PARSE_GET_DESC || nmsgs == 0) {
-		fprintf(stderr, "Error: Incomplete message\n");
-		goto err_out;
-	}
-
-	if (yes) {
-		struct i2c_rdwr_ioctl_data rdwr;
-
-		for(i = 0; i< nmsgs; i++ ){
-			printf("\n ------- %d msg : ", i);
-			printf("addr:%4x   ", msgs[i].addr);
-			printf("flags:%4x   ", msgs[i].flags);
-			printf("buflen:%d   ", msgs[i].len);
-			for(j = 0; j< msgs[i].len; j ++)
-				printf("| 0x%2x ", msgs[i].buf[j]);
-			printf("\n \n ");
-		}
-
-
-		rdwr.msgs = msgs;
-		rdwr.nmsgs = nmsgs;
-		nmsgs_sent = ioctl(file, I2C_RDWR, &rdwr);
-		if (nmsgs_sent < 0) {
-			fprintf(stderr, "Error: Sending messages failed: %s\n", strerror(errno));
-			goto err_out;
-		} 
-		print_msgs(msgs, nmsgs_sent, PRINT_READ_BUF | (1 ? PRINT_HEADER | PRINT_WRITE_BUF : 0));
 	}
 
 	close(file);
 
-	for (i = 0; i < nmsgs; i++)
-		free(msgs[i].buf);
+	for (i = 0; i < size_allmsgs; i++)
+		free(all_msgs[i].buf);
 
-	exit(0);
+	return 0;
+
 
  err_out_with_arg:
-	fprintf(stderr, "Error: faulty argument is '%s'\n", argv[arg_idx]);
+	fprintf(stderr, "Error: faulty ");
  err_out:
 	close(file);
 

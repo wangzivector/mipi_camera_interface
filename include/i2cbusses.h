@@ -45,6 +45,11 @@ enum parse_state {
 	PARSE_GET_DATA,
 };
 
+enum i2c_dir {
+	I2C_WRITE_MODE,
+	I2C_READ_MODE,
+};
+
 struct reg {
     unsigned short int address;
     unsigned short int value;
@@ -59,7 +64,7 @@ struct reg {
 
 int open_i2c_dev(int i2cbus, char *filename, size_t size, int quiet);
 int set_slave_addr(int file, int address, int force);
-int i2c_main(void);
+int i2cReadWrite(struct reg regs[], int n_reg, enum i2c_dir dir);
 
 #define MISSING_FUNC_FMT	"Error: Adapter does not have %s capability\n"
 

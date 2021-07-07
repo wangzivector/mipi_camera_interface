@@ -454,69 +454,24 @@ void startCapturing(void) // make it start stream iamge data
 
 void setRegExtMode(void)
 {
-
-    i2c_main();
-
-    // int file;
-    // int adapter_nr = 11;
-    // char filename[20];
-
-    // int addr = 0x60;
-    // char adapter_nr_str[5];
-    // int count_regs;
-    // struct reg {
-    //     unsigned short int address;
-    //     unsigned short int value;
-    //     };
-
-    // struct reg regs[] = {
-    //     {0x4F00, 0x01},
-    //     {0x3030, 0x04},
-    //     {0x303F, 0x01},
-    //     {0x302C, 0x00},
-    //     {0x302F, 0x7F},
-    //     {0x3823, 0x30},
-    //     {0x0100, 0x00}
-    //     };
-
-    // const int regs_size = sizeof(regs) / sizeof(regs[0]);
-
-    // snprintf(adapter_nr_str, 5,"%d", adapter_nr);
-    // adapter_nr = lookup_i2c_bus(adapter_nr_str);
-
-    // file = open_i2c_dev(adapter_nr, filename, sizeof(filename), 0);
-    // printf("file name is %s \n", filename);
-
-    // if(file < 0){
-    //     printf("file = open(filename, O_RDWR); Error no.%d: %s\n", errno, strerror(errno));
-    //     exit(1);
-    // }
-
-    // if(ioctl(file, I2C_SLAVE_FORCE, addr) < 0){
-    //     printf("(ioctl(file, I2C_SLAVE, addr) < 0); Error no.%d: %s\n", errno, strerror(errno));
-    //     exit(1);
-    // }
-
-    
-    // // first lets try to read the register.
-    // struct i2c_hndl reg2val1;
-    // reg2val1.fd = file;
-    // reg2val1.addr = addr;
-    // reg2val1.reg_width = I2C_16BIT;
-    // reg2val1.val_width = I2C_8BIT;
-    // printf("data register read as : %d \n", i2c_read(&reg2val1, 0x302f));
-
-    // // for(count_regs = 0; count_regs < regs_size; count_regs ++)
-    // // {
-        
-    // //     if (-1 == xioctl(fd, VIDIOC_REQBUFS, &req)) //
-    // //         printf("");
-
-    // // }
+	struct reg regs[] = {
+		{0x4F00, 0x01},
+		{0x3030, 0x04},
+		{0x303F, 0x00},
+		// {0x302C, 0x00},
+		// {0x302F, 0x7F},
+		// {0x302C, 0x00},
+		// {0x302F, 0x00},
+		{0x3823, 0x30},
+		{0x0100, 0x00},
+	}; 
+    i2cReadWrite(&regs, sizeof(regs)/sizeof(struct reg), I2C_WRITE_MODE);
+    i2cReadWrite(&regs, sizeof(regs)/sizeof(struct reg), I2C_READ_MODE);
 }
 
 void stopCapturing(void) // stop the driver from streaming data
 {
+
     printf("\n   /////////////////\n    STOP CAPTURING\n");
 
     enum v4l2_buf_type type;

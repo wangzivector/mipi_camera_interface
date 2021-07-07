@@ -75,6 +75,7 @@ static int readFrame(void)
     struct v4l2_buffer buf;
     unsigned int i, count;
     struct timeval begin, end;
+    int uncatched = 0;
     gettimeofday(&begin, 0);
 
     for (count = 0; count < frame_count; count ++)
@@ -112,24 +113,35 @@ static int readFrame(void)
             buf.memory = V4L2_MEMORY_MMAP;
             if (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process
             {
+                // uncatched = 1;
                 switch (errno)
                 {
                 case EAGAIN:
-                    printf("there is no image availble yet, please wait\r");
                     while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process    
-                    usleep(10);
-                    break;
+                    {
+                        printf("there is no image availble yet, please wait ... uncatched = %d \r", uncatched++);
+                        usleep(1);
+                    }
+                   break;
                     // return 0;
                 case EIO:
+                    printf("EIO error ..\r");
                     break;
                     /* Could ignore EIO, see spec. */
                     /* fall through */
                 default:
+                    printf("unknown error ..\r");
                     errno_exit("VIDIOC_DQBUF");
                 }
                 
             }
 
+            // if (uncatched == 1) 
+            // {
+            //     uncatched = 0;
+            //     continue;
+            // }
+            // if(buf.bytesused == 0) continue;
             assert(buf.index < n_buffers);
             process_image(buffers[buf.index].start, buf.bytesused, count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
 
@@ -186,11 +198,13 @@ int main(int argc, char **argv)
     // selectDevice(checkDeivce());
     // enumerateMenuList();
     // enumerateExtMenuList();
-    cameraFunctionsControl(V4L2_CID_EXPOSURE_AUTO, 1);
-    cameraFunctionsControl(V4L2_CID_EXPOSURE_ABSOLUTE, 100);
-    setRegExtMode();
+    // no use
+    // cameraFunctionsControl(V4L2_CID_EXPOSURE_AUTO, 1);
+    // cameraFunctionsControl(V4L2_CID_EXPOSURE_ABSOLUTE, 50);
     // enumerateExtendedControl();
     startCapturing();
+    setRegExtMode();
+    
     if(show_image_enable)  SDL_display_init();
 
     readFrame();
