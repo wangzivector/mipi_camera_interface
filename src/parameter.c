@@ -2,6 +2,25 @@
 
 int force_format = 0;
 
+// int frame_width = 640;
+// int frame_height = 400;
+
+int frame_width = 1280;
+int frame_height = 800;
+
+int frame_count = 20;
+
+int save_image_enable = 0;
+int show_image_enable = 0;
+int ext_trg_enable = 0;
+int vid_stream_enable = 0;
+
+char *save_folder = "./iamge/";
+char *dev_name = "/dev/video0";
+
+enum io_method io = IO_METHOD_MMAP;
+// enum io_method io = IO_METHOD_READ;
+
 
 void option_usage(FILE *fp, int argc, char **argv)
 {
@@ -9,13 +28,14 @@ void option_usage(FILE *fp, int argc, char **argv)
             "Usage: %s [options]\n\n"
             "Version 1.3\n"
             "Options:\n"
-            "-s | --save image    image folder path name: [%s]\n"
+            "-s | --save          image folder path name: [%s]\n"
             "-h | --help          Print this message\n"
             "-m | --mmap          Use memory mapped buffers [default]\n"
-            "-d | --display iamge show_image_enable\n"
+            "-d | --display       iamge show_image_enable\n"
             "-u | --userp         Use application allocated buffers\n"
-            "-o | --output        Outputs stream to stdout\n"
-            "-f | --format        Force format to 640x480 YUYV\n"
+            "-e | --external      outer trigger mode \n"
+            "-v | --video         video stream mode, not external trigger\n"
+            "-f | --force         force set video format,like rgb and resolution\n"
             "-c | --count         Number of frames to grab [%i]\n"
             "\n",
             argv[0], dev_name, frame_count);
@@ -24,7 +44,7 @@ void option_usage(FILE *fp, int argc, char **argv)
 int set_option(int argc, char **argv)
 {
 
-const char short_options[] = "s:hmduofc:";
+const char short_options[] = "s:hmduevfc:";
 
 const struct option
     long_options[] = {
@@ -33,8 +53,9 @@ const struct option
         {"mmap", no_argument, NULL, 'm'},
         {"disp", no_argument, NULL, 'd'},
         {"userp", no_argument, NULL, 'u'},
-        {"output", no_argument, NULL, 'o'},
-        {"format", no_argument, NULL, 'f'},
+        {"external", no_argument, NULL, 'e'},
+        {"video", no_argument, NULL, 'v'},
+        {"force", no_argument, NULL, 'f'},
         {"count", required_argument, NULL, 'c'},    
         {0, 0, 0, 0}};
 
@@ -75,7 +96,12 @@ const struct option
             io = IO_METHOD_USERPTR;
             break;
 
-        case 'o':
+        case 'e':
+            ext_trg_enable = 1;
+            break;
+
+        case 'v':
+            vid_stream_enable = 1;
             break;
 
         case 'f':

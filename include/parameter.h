@@ -47,6 +47,8 @@ extern int frame_count;
 
 extern int save_image_enable;
 extern int show_image_enable;
+extern int ext_trg_enable;
+extern int vid_stream_enable;
 extern char *save_folder;
 extern char *dev_name;
 

@@ -104,10 +104,9 @@ int SDL_display(const unsigned char *pData, int bitperpix)
 
     /* Ensures we have exclusive access to the pixels */
     SDL_LockSurface(SDL_scr);
-
     
-    for(y = 0; y < SDL_scr->h; y++)
-        for(x = 0; x < SDL_scr->w; x++)
+    for(y = 0; y < SDL_scr->h; y+=10)
+        for(x = 0; x < SDL_scr->w; x+=10)
         {
             // #define pel(surf, x, y, rgb) ((unsigned char *)(surf->pixels))[y*(surf->pitch)+x*3+rgb]
             pel(SDL_scr, x, y, 0) = *(pData+((y*frame_width)+x)*ByteperPix +BiasofPix0); //red
@@ -115,6 +114,7 @@ int SDL_display(const unsigned char *pData, int bitperpix)
             pel(SDL_scr, x, y, 2) = *(pData+((y*frame_width)+x)*ByteperPix +BiasofPix2); //blue
             // printf("%d", *(pData + (y * frame_width) + x + 0));
         }
+        
     SDL_UnlockSurface(SDL_scr);
 
     /* Copies the `scr' surface to the _actual_ screen */

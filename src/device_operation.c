@@ -408,9 +408,9 @@ void startCapturing(void) // make it start stream iamge data
     switch (io)
     {
     case IO_METHOD_READ:
-        /* Nothing to do. */
         break;
 
+/////////////////////////////////////////////////////////////////////
     case IO_METHOD_MMAP:                // default mode
         for (i = 0; i < n_buffers; ++i) // for each buffer container
         {
@@ -428,6 +428,7 @@ void startCapturing(void) // make it start stream iamge data
         if (-1 == xioctl(fd, VIDIOC_STREAMON, &type)) // start to stream video?(start cache the image data into buffer)
             errno_exit("VIDIOC_STREAMON");
         break;
+/////////////////////////////////////////////////////////////////////
 
     case IO_METHOD_USERPTR:
         for (i = 0; i < n_buffers; ++i)
@@ -454,19 +455,54 @@ void startCapturing(void) // make it start stream iamge data
 
 void setRegExtMode(void)
 {
-	struct reg regs[] = {
-		{0x4F00, 0x01},
-		{0x3030, 0x04},
+	struct reg regs_trigger[] = {
+		{0x4F00, 0x01}, // low power mode, external mode needed
+		{0x3030, 0x04}, // external mode
+		{0x303F, 0x01}, // captured num frame(s) when trigger arrives
+		{0x302C, 0x00}, // confusing sleep period nums
+		{0x302F, 0x7F}, // confusing sleep period nums 2
+		{0x3823, 0x30}, // external timing setting
+		{0x0100, 0x00}, // PLL model 0:software standby or 1:streaming
+	};
+	struct reg regs_stream[] = {
+		{0x4F00, 0x00},
+		{0x3030, 0x00},
 		{0x303F, 0x00},
-		// {0x302C, 0x00},
-		// {0x302F, 0x7F},
+		{0x302C, 0x00},
+		{0x302F, 0x7F},
 		// {0x302C, 0x00},
 		// {0x302F, 0x00},
-		{0x3823, 0x30},
-		{0x0100, 0x00},
-	}; 
-    i2cReadWrite(&regs, sizeof(regs)/sizeof(struct reg), I2C_WRITE_MODE);
-    i2cReadWrite(&regs, sizeof(regs)/sizeof(struct reg), I2C_READ_MODE);
+		{0x3823, 0x08},
+		{0x0100, 0x01},
+	};
+	struct reg regs_GainExpose[] = {
+		{0x3503, 0x03}, // manual control of exposure and gain -- 0x08
+		{0x3509, 0x60}, // manual control of exposure and gain -- 0x08
+        {0x350A, 0x04}, // digital gain num [7:0]-->[13:6]     -- 0x04
+        {0x350B, 0x00}, // digital gain num [5:0]-->[5:0]      -- 0x00
+        {0x3500, 0x00}, // long exposure [3:0]-->[19:16]       -- 0x00
+        {0x3501, 0x2c}, // long exposure [7:0]-->[15:8]        -- 0x2c
+        {0x3502, 0x10}, // long exposure [7:4]-->[3:0]  [7:4]-->fraction bits[3:0] -- 0x10   
+	};
+
+    if (ext_trg_enable)
+    {
+        printf("Trigger mode enabled, writing iic register.\n");
+        i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_WRITE_MODE);
+        i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
+    }
+    else if(vid_stream_enable)
+    {
+        printf("Stream mode enabled, writing iic register.\n");
+        i2cReadWrite(&regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_WRITE_MODE);
+        i2cReadWrite(&regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_READ_MODE);
+    }
+    
+    i2cReadWrite(&regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_WRITE_MODE);
+    i2cReadWrite(&regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_READ_MODE);
+    usleep(10);
+        // i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
+
 }
 
 void stopCapturing(void) // stop the driver from streaming data
