@@ -8,11 +8,6 @@
 struct buffer *buffers;
 struct timeval tv;
 
-enum process_mode{
-    TEMP_COPY,
-    ALL_PROCESS,
-};
-
 struct pic_temp_save{
     void *pic_buffer;
     int size;
@@ -20,39 +15,29 @@ struct pic_temp_save{
 
 int fd = -1;
 unsigned int i, n_buffers;
-char out_name[256];
-
-struct pic_temp_save pic_buffs[300];
 
 // static void process_image(const void *pic_buffer, int size, int index_image, enum process_mode mdoe)
-static void process_image(const void *pic_buffer, int size, int index_image)
+static void process_image(const struct buffer *buf_img, int index_image)
 {
 
-    // if (mdoe == TEMP_COPY)
-    // {
-    //     void *pic_buffer = 
-
-    //     return;
-    // }
-
-
     // printf("\r\n   /////////////////\n    PROCESSING IMAGE\n");
-    printf("\rimage size is : %d  ", size);
-    switch (size/(frame_width*frame_height))
+    printf("\rimage size is : %d  ", buf_img->length);
+    switch (buf_img->length/(frame_width*frame_height))
     {
         case 3: 
             printf("image seems RGB format");
             if(save_image_enable)
             {
-                char picname[100];
-                sprintf(picname,"%sov5MP_%d*%d_%d.bmp",save_folder ,frame_width,frame_height, index_image);
-                GenBmpFile(pic_buffer,24, frame_width,frame_height,picname); 
-                printf("\rimage saved: %s", picname);
+                // char picname[100];
+                // sprintf(picname,"%sov5MP_%d*%d_%d.bmp",save_folder ,frame_width,frame_height, index_image);
+                // GenBmpFile(buf_img.start, 24, frame_width,frame_height,picname); 
+                LoadJpgFile(buf_img);
+                // printf("\rimage saved: %s", picname);
             }
             if(show_image_enable)
             {
                 printf(", displaying image");
-                SDL_display(pic_buffer,24);
+                SDL_display_process(buf_img);
             }
             break;
 
@@ -60,15 +45,16 @@ static void process_image(const void *pic_buffer, int size, int index_image)
             printf("image seems GREY format");
             if (save_image_enable)
             {
-                char picname[100];
-                sprintf(picname,"%sov9281_%d*%d_%03d.bmp",save_folder ,frame_width,frame_height, index_image);
-                GenBmpFile(pic_buffer, 8, frame_width, frame_height, picname); 
-                printf("\nimage saved: %s", picname);
+                // char picname[100];
+                // sprintf(picname,"%sov9281_%d*%d_%03d.bmp",save_folder ,frame_width,frame_height, index_image);
+                // GenBmpFile(buf_img.start, 8, frame_width, frame_height, picname); 
+                LoadJpgFile(buf_img);
+                // printf("\nimage saved: %s", picname);
             }
             if(show_image_enable)
             {
                 printf(", displaying image");
-                SDL_display(pic_buffer,8);
+                SDL_display_process(buf_img);
             }
             break;
 
@@ -113,7 +99,7 @@ static int readFrame(void)
             }
                 count ++;
 
-            process_image(buffers[0].start, buffers[0].length, count);
+            process_image(&buffers[0], count);
             break;
 
         case IO_METHOD_MMAP: // default mode
@@ -128,38 +114,36 @@ static int readFrame(void)
                 {
                 case EAGAIN:
                     while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process    
-                    {
+                    {   
                         uncatched++;
                         // printf("there is no image availble yet, please wait .                  .. uncatched = %d \r", uncatched++);
                         // usleep(1);
                     }
                    break;
-                    // return 0;
+
                 case EIO:
                     printf("EIO error ..\r");
                     break;
-                    /* Could ignore EIO, see spec. */
-                    /* fall through */
                 default:
                     printf("unknown error ..\r");
                     errno_exit("VIDIOC_DQBUF");
                 }
             }
-
             if ((uncatched - uncatched_last) > UNCHATED_FILTER_VALUE) 
             {
-                printf("\npriorly ignore the first frame after capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
+                printf("\nIgnore first frame after trig %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
             }
             else
             {
                 printf("seem normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
                 assert(buf.index < n_buffers);
-                process_image(buffers[buf.index].start, buf.bytesused, count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
+                process_image(&buffers[buf.index], count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
                 
                 count ++;
                 gettimeofday(&end, 0);
-                printf("num %d -- frame rate: %.02f   ---- time : %.02f ms\n", count, 1/((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6), 
-                    ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6)*1000.0);
+                float sec_loop = ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6);
+                printf("num %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", count,sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********":" ");
+                
                 gettimeofday(&begin, 0);
             }
             
@@ -197,7 +181,11 @@ static int readFrame(void)
 
             assert(i < n_buffers);
 
-            process_image((void *)buf.m.userptr, buf.bytesused, count);
+            struct buffer image_buf = {
+                (void *)buf.m.userptr,
+                 buf.bytesused
+            };
+            process_image(&image_buf, count);
 
             if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
                 errno_exit("VIDIOC_QBUF");
@@ -224,14 +212,17 @@ int main(int argc, char **argv)
     startCapturing();
     setRegExtMode();
     
-    if(show_image_enable)  SDL_display_init();
+    // if(show_image_enable)  SDL_display_init();
+    if(show_image_enable) SDL_init();
+    if(save_image_enable) StartJpgFile();
 
     readFrame();
-
     stopCapturing();
-    uninitDevice();
+    if(show_image_enable)  SDL_deinit();
+    if(save_image_enable)  FinishJpgFile();
 
+    uninitDevice();
     closeDevice();
-    if(show_image_enable)  SDL_display_wait2close();
+
     return 0;
 }

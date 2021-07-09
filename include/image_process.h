@@ -11,11 +11,22 @@
 
 union SDL_Event event;
 struct SDL_Surface *SDL_scr;
+SDL_Surface *data_sf;
+
 
 int GenBmpFile(const unsigned char *pData, unsigned char bitCountPerPix, unsigned int width, unsigned int height, const char *filename);
-int GenJpgFile(struct buffer *buffers,const char *filename);
+
+int StartJpgFile(void);
+int LoadJpgFile(const struct buffer *buf_img);
+int FinishJpgFile(void);
+
 int SDL_display_init();
 int SDL_display(const unsigned char *pData, int bitperpix);
 int SDL_display_wait2close(void);
+
+int SDL_display_process(const struct buffer *buf_img);
+int SDL_init(void);
+void SDL_deinit(void);
+
 
 #endif 

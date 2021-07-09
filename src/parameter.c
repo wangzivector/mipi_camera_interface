@@ -2,9 +2,6 @@
 
 int force_format = 0;
 
-// int frame_width = 640;
-// int frame_height = 400;
-
 int frame_width = 1280;
 int frame_height = 800;
 
@@ -15,7 +12,7 @@ int show_image_enable = 0;
 int ext_trg_enable = 0;
 int vid_stream_enable = 0;
 
-char *save_folder = "./iamge/";
+char *save_folder = "./image/";
 char *dev_name = "/dev/video0";
 
 enum io_method io = IO_METHOD_MMAP;
@@ -44,11 +41,11 @@ void option_usage(FILE *fp, int argc, char **argv)
 int set_option(int argc, char **argv)
 {
 
-const char short_options[] = "s:hmduevfc:";
+const char short_options[] = "shmduevfc:";
 
 const struct option
     long_options[] = {
-        {"save", required_argument, NULL, 's'},
+        {"save", no_argument, NULL, 's'},
         {"help", no_argument, NULL, 'h'},
         {"mmap", no_argument, NULL, 'm'},
         {"disp", no_argument, NULL, 'd'},
@@ -77,7 +74,7 @@ const struct option
 
         case 's':
             save_image_enable = 1;
-            save_folder = optarg;
+            // save_folder = optarg;
             break;
 
         case 'h':

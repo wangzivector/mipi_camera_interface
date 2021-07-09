@@ -20,7 +20,8 @@
 
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
- 
+#define BYTEPERPIX 1
+
 struct buffer
 {
     void *start;

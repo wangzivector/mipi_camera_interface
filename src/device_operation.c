@@ -455,6 +455,7 @@ void startCapturing(void) // make it start stream iamge data
 
 void setRegExtMode(void)
 {
+
 	struct reg regs_trigger[] = {
 		{0x4F00, 0x01}, // low power mode, external mode needed
 		{0x3030, 0x04}, // external mode
@@ -463,17 +464,21 @@ void setRegExtMode(void)
 		{0x302F, 0x7F}, // confusing sleep period nums 2
 		{0x3823, 0x30}, // external timing setting
 		{0x0100, 0x00}, // PLL model 0:software standby or 1:streaming
+		{0x3006, 0x0c}, // [1]:direction of fsin, [3]:strobe pin direction -- 0x04 
+		// {0x3023, 0x02}, // [1]:powermode of MIPI 
 	};
 	struct reg regs_stream[] = {
 		{0x4F00, 0x00},
 		{0x3030, 0x00},
-		{0x303F, 0x00},
+		{0x303F, 0x00}, 
 		{0x302C, 0x00},
 		{0x302F, 0x7F},
 		// {0x302C, 0x00},
 		// {0x302F, 0x00},
 		{0x3823, 0x08},
 		{0x0100, 0x01},
+		{0x3006, 0x04}, // direction of fsin -- 0x04
+
 	};
 	struct reg regs_GainExpose[] = {
 		{0x3503, 0x03}, // manual control of exposure and gain -- 0x08
@@ -484,6 +489,13 @@ void setRegExtMode(void)
         {0x3501, 0x2c}, // long exposure [7:0]-->[15:8]        -- 0x2c
         {0x3502, 0x10}, // long exposure [7:4]-->[3:0]  [7:4]-->fraction bits[3:0] -- 0x10   
 	};
+
+    struct reg more_regs[] = {
+		{0x300d, 0x60},
+		// {0x3027, 0x00},
+	};
+
+    
 
     if (ext_trg_enable)
     {
@@ -500,9 +512,14 @@ void setRegExtMode(void)
     
     i2cReadWrite(&regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_WRITE_MODE);
     i2cReadWrite(&regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_READ_MODE);
-    usleep(10);
+    
+    
+    i2cReadWrite(&more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_READ_MODE);
+    i2cReadWrite(&more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_WRITE_MODE);
+    
+    // usleep(10);
         // i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
-
+    // exit(0);
 }
 
 void stopCapturing(void) // stop the driver from streaming data
