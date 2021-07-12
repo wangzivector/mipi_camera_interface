@@ -3,7 +3,6 @@
 #include "device_operation.h"
 #include "camera_control.h"
 
-#define UNCHATED_FILTER_VALUE 10000
 
 struct buffer *buffers;
 struct timeval tv;
@@ -129,13 +128,13 @@ static int readFrame(void)
                     errno_exit("VIDIOC_DQBUF");
                 }
             }
-            if ((uncatched - uncatched_last) > UNCHATED_FILTER_VALUE) 
+            // if ((uncatched - uncatched_last) > UNCHATED_FILTER_VALUE) 
+            // {
+            //     printf("\nIgnore first frame after trig %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
+            // }
+            // else
             {
-                printf("\nIgnore first frame after trig %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
-            }
-            else
-            {
-                printf("seem normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
+                printf("normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
                 assert(buf.index < n_buffers);
                 process_image(&buffers[buf.index], count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
                 

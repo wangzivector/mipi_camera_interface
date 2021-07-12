@@ -138,19 +138,90 @@ static void print_msgs(struct i2c_msg *msgs, __u32 nmsgs, unsigned flags)
 	}
 }
 
-int i2cReadWrite(struct reg regs[], int n_reg, enum i2c_dir dir)
+int i2cRead6FromAdr1(int i2cbus, unsigned char bus_address, struct R6fromA1 read_msg)
+{
+	int i, j, nmsgs_sent, nmsgs;
+	char filename[20];
+	int file;
+	struct i2c_msg msgs[2];
+	unsigned char data;
+	struct i2c_rdwr_ioctl_data rdwr;
+	unsigned char *buf;
+	unsigned short int  flags = 0;
+
+	file = open_i2c_dev(i2cbus, filename, sizeof(filename), 0); // open device, filename is wait2fill value
+	if (file < 0 || check_funcs(file)) // check device is iic-related device 
+		exit(1);
+
+// reg address buffer
+	msgs[0].addr = bus_address; // address, always the same
+	msgs[0].flags = flags; // default writing mode
+	msgs[0].len = 1;    // num of operating bytes
+	buf = malloc(msgs[0].len); // create buffer for writer buffer
+	if (!buf) {
+		fprintf(stderr, "Error: No memory for buffer\n");
+		goto err_out_with_arg;
+	}
+	memset(buf, 0, msgs[0].len);
+	msgs[0].buf = buf; // clear the buffer (write) nall_msgs is the msg index
+	data = read_msg.reg;
+	msgs[0].buf[0] = data;
+
+
+// read buffer
+	msgs[1].addr = bus_address; // address, always the same
+	msgs[1].flags = flags|I2C_M_RD; // default writing mode
+	msgs[1].len = 6;    // num of operating bytes
+	if (msgs[1].len) {
+		buf = malloc(msgs[1].len); // create buffer for writer buffer
+		if (!buf) {
+			fprintf(stderr, "Error: No memory for buffer\n");
+			goto err_out_with_arg;
+		}
+	}
+	memset(buf, 0, msgs[1].len);
+	msgs[1].buf = buf; // clear the buffer (write) nall_msgs is the msg index
+	msgs[1].buf[0] = 0x00;
+
+	nmsgs = 2;
+	rdwr.msgs = msgs;
+	rdwr.nmsgs = nmsgs;
+	nmsgs_sent = ioctl(file, I2C_RDWR, &rdwr);
+
+	if (nmsgs_sent < 0) {
+		fprintf(stderr, "Error: Sending messages failed: %s\n", strerror(errno));
+		goto err_out;
+	} 
+
+	print_msgs(msgs, nmsgs_sent, PRINT_READ_BUF | (1 ? PRINT_HEADER | PRINT_WRITE_BUF : 0));
+	
+	for (i = 0; i < 3; i++)
+		read_msg.data[i] = (short)(msgs[1].buf[i*2 + 1]) << 8 + (msgs[1].buf[i*2]);
+
+	close(file);
+
+	for (i = 0; i < 2; i++)
+		free(msgs[i].buf);
+
+	return 0;
+
+ err_out_with_arg:
+	fprintf(stderr, "Error: faulty ");
+ err_out:
+	close(file);
+	for (i = 0; i <= nmsgs; i++)
+		free(msgs[i].buf);
+	exit(1);
+}
+
+int i2cReadWrite(int i2cbus, unsigned char bus_address, struct reg regs[], int n_reg, enum i2c_dir dir)
 {
 	int i, j;
 	char filename[20];
-	int file, i2cbus = 11;
+	int file;
 	int nmsgs_sent, size_allmsgs, nmsgs = 0;
-	unsigned char bus_address = 0x60;
 	unsigned short int data, flags = 0;
 	unsigned char *buf;
-
-	// int force = 1;
-	
-	bus_address = 0x60;
 
 	struct i2c_msg msgs[2], all_msgs[I2C_RDRW_IOCTL_MAX_MSGS]; // create sending messsage
 	// enum parse_state state = PARSE_GET_DESC; // sending mode

@@ -110,104 +110,33 @@ make && ./src/camera_image_grab -f -s ./image/ -c 20
 
 
 
-
-   num of regs to read: 5
-msg 0: addr 0x60, write, len 3, buf 0x4f 0x00 0x01
-msg 0: addr 0x60, write, len 3, buf 0x30 0x30 0x04
-msg 0: addr 0x60, write, len 3, buf 0x30 0x3f 0x00
-msg 0: addr 0x60, write, len 3, buf 0x38 0x23 0x30
-msg 0: addr 0x60, write, len 3, buf 0x01 0x00 0x00
-   num of regs to read: 5
-msg 0: addr 0x60, write, len 2, buf 0x4f 0x00
-msg 1: addr 0x60, read, len 1, buf 0x01
-msg 0: addr 0x60, write, len 2, buf 0x30 0x30
-msg 1: addr 0x60, read, len 1, buf 0x04
-msg 0: addr 0x60, write, len 2, buf 0x30 0x3f
-msg 1: addr 0x60, read, len 1, buf 0x00
-msg 0: addr 0x60, write, len 2, buf 0x38 0x23
-msg 1: addr 0x60, read, len 1, buf 0x30
-msg 0: addr 0x60, write, len 2, buf 0x01 0x00
-msg 1: addr 0x60, read, len 1, buf 0x00
-
-   /////////////////
-    READ FRAME
- -- frame rate: inf
-image saved: ./image/ov9281_1280*800_0.bmp -- frame rate: 56.557887
-image saved: ./image/ov9281_1280*800_1.bmp -- frame rate: 81.612666
-image saved: ./image/ov9281_1280*800_2.bmp -- frame rate: 76.115086
-image saved: ./image/ov9281_1280*800_3.bmp -- frame rate: 93.676815
-image saved: ./image/ov9281_1280*800_4.bmp -- frame rate: 96.348396
-image saved: ./image/ov9281_1280*800_5.bmp -- frame rate: 89.285714
-image saved: ./image/ov9281_1280*800_6.bmp -- frame rate: 100.938730
-image saved: ./image/ov9281_1280*800_7.bmp -- frame rate: 98.493056
-image saved: ./image/ov9281_1280*800_8.bmp -- frame rate: 109.253797
-image saved: ./image/ov9281_1280*800_9.bmp -- frame rate: 83.633018
-image saved: ./image/ov9281_1280*800_10.bmp -- frame rate: 93.668040
-image saved: ./image/ov9281_1280*800_11.bmp -- frame rate: 69.749599
-image saved: ./image/ov9281_1280*800_12.bmp -- frame rate: 63.087502
-image saved: ./image/ov9281_1280*800_13.bmp -- frame rate: 74.305246
-image saved: ./image/ov9281_1280*800_14.bmp -- frame rate: 71.906234
-image saved: ./image/ov9281_1280*800_15.bmp -- frame rate: 76.540375
-image saved: ./image/ov9281_1280*800_16.bmp -- frame rate: 62.386924
-image saved: ./image/ov9281_1280*800_17.bmp -- frame rate: 106.974754
-image saved: ./image/ov9281_1280*800_18.bmp -- frame rate: 106.123315
-image saved: ./image/ov9281_1280*800_19.bmpormat
-   /////////////////
- 
-   /////////////////
-    START CAPTURING
-   num of regs to read: 5
-msg 0: addr 0x60, write, len 3, buf 0x4f 0x00 0x01
-msg 0: addr 0x60, write, len 3, buf 0x30 0x30 0x04
-msg 0: addr 0x60, write, len 3, buf 0x30 0x3f 0x00
-msg 0: addr 0x60, write, len 3, buf 0x38 0x23 0x30
-msg 0: addr 0x60, write, len 3, buf 0x01 0x00 0x00
-   num of regs to read: 5
-msg 0: addr 0x60, write, len 2, buf 0x4f 0x00
-msg 1: addr 0x60, read, len 1, buf 0x01
-msg 0: addr 0x60, write, len 2, buf 0x30 0x30
-msg 1: addr 0x60, read, len 1, buf 0x04
-msg 0: addr 0x60, write, len 2, buf 0x30 0x3f
-msg 1: addr 0x60, read, len 1, buf 0x00
-msg 0: addr 0x60, write, len 2, buf 0x38 0x23
-msg 1: addr 0x60, read, len 1, buf 0x30
-msg 0: addr 0x60, write, len 2, buf 0x01 0x00
-msg 1: addr 0x60, read, len 1, buf 0x00
-
-   /////////////////
-    READ FRAME
- -- frame rate: inf
-image saved: ./image/ov9281_1280*800_0.bmp -- frame rate: 64.466220
-image saved: ./image/ov9281_1280*800_1.bmp -- frame rate: 43.466922
-image saved: ./image/ov9281_1280*800_2.bmp -- frame rate: 20.501046
-image saved: ./image/ov9281_1280*800_3.bmp -- frame rate: 19.121556
-image saved: ./image/ov9281_1280*800_4.bmp -- frame rate: 20.728396
-image saved: ./image/ov9281_1280*800_5.bmp -- frame rate: 21.247211
-image saved: ./image/ov9281_1280*800_6.bmp -- frame rate: 18.684255
-image saved: ./image/ov9281_1280*800_7.bmp -- frame rate: 19.818856
-image saved: ./image/ov9281_1280*800_8.bmp -- frame rate: 20.423585
-image saved: ./image/ov9281_1280*800_9.bmp -- frame rate: 21.143437
-image saved: ./image/ov9281_1280*800_10.bmp -- frame rate: 19.800804
-image saved: ./image/ov9281_1280*800_11.bmp -- frame rate: 17.763882
-image saved: ./image/ov9281_1280*800_12.bmp -- frame rate: 18.385733
-image saved: ./image/ov9281_1280*800_13.bmp -- frame rate: 23.969894
-image saved: ./image/ov9281_1280*800_14.bmp -- frame rate: 20.446971
-image saved: ./image/ov9281_1280*800_15.bmp -- frame rate: 21.208908
-image saved: ./image/ov9281_1280*800_16.bmp -- frame rate: 19.390367
-image saved: ./image/ov9281_1280*800_17.bmp -- frame rate: 18.860452
-image saved: ./image/ov9281_1280*800_18.bmp -- frame rate: 21.073927
-image saved: ./image/ov9281_1280*800_19.bmpormatuncatched = 8000 
-   /////////////////
-    STOP CAPTURING
-
-   /////////////////
-    UNINIT DEVICE
-
-   /////////////////
-    CLOSE DEVICE
-
-
-
 ################
 
 add more buf size to v4l2, preventing frame drop issure
+
+
+pi@raspberrypi:~ $ i2ctransfer -f -y 1 w2@0x28 0x3d 0x00
+pi@raspberrypi:~ $ i2ctransfer -f -y 1 w2@0x28 0x3f 0x20
+pi@raspberrypi:~ $ i2ctransfer -f -y 1 w2@0x28 0x3e 0x00
+pi@raspberrypi:~ $ i2ctransfer -f -y 1 w2@0x28 0x3d 0x0c
+pi@raspberrypi:~ $ i2ctransfer -f -y 1 w2@0x28 0x3f 0x80
+
+
+
+## data protcol between linux and mcu -- spi
+head[4 bytes] + data[4n bytes] n>=0
+
+msg{
+	head[0:4]{
+		headmark[0] == b01010101
+		Byte [1] - [datatype[4 bits] : datasize[4 bits]] = 4*n
+		Byte [2:3] - sequence / num <unsigned short>
+	}
+
+	data[0:4*n]
+}
+
+
+
+
+

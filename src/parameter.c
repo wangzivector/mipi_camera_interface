@@ -5,6 +5,9 @@ int force_format = 0;
 int frame_width = 1280;
 int frame_height = 800;
 
+// int frame_width = 640;
+// int frame_height = 400;
+
 int frame_count = 20;
 
 int save_image_enable = 0;

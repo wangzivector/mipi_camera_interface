@@ -16,6 +16,7 @@ IMAGE_SAVE_MODE save_mode  = MIDDLE_COM_SAVE;
 struct buffer tempsave[300];
 int tempsave_index = 0;
 FILE *fp_jpg;
+// int fp_jpg;
 
 int StartJpgFile(void)
 {
@@ -25,10 +26,11 @@ int StartJpgFile(void)
         case MIDDLE_COM_SAVE:
         // break;
         case FINAL_COM_SAVE:
-            fp_jpg = fopen("./image/images_0v9281.raw", "wb");
+            fp_jpg = fopen("./images_0v9281.raw", "wb");
+            // fp_jpg = open("./images_0v9281.raw", O_RDWR | /* O_SYNC | */ O_CREAT | O_EXCL | O_TRUNC, S_IRWXO);
             if(!fp_jpg)
             {
-                printf("fopen failed : %s, %d\n", __FILE__, __LINE__);
+                printf("fopen failed\n");
                 return 0;
             }
         break;
@@ -46,8 +48,11 @@ int LoadJpgFile(const struct buffer *buf_img){
 
     switch (save_mode){
         case MIDDLE_COM_SAVE:
-            fwrite(buf_img->start, buf_img->length, 1, fp_jpg);
+            // fwrite(buf_img->start, buf_img->length, 1, fp_jpg);
             // sync();
+            // printf("\nwrite fd_%d result : %d ", fp_jpg, write(fp_jpg, buf_img->start, buf_img->length));
+            printf("\nwrite fd_%d result : %d ", fp_jpg, fwrite(buf_img->start, buf_img->length, 1, fp_jpg));
+            fflush(fp_jpg);
         break;
 
         case FINAL_SEP_SAVE:
@@ -87,6 +92,7 @@ int FinishJpgFile(void)
             case FINAL_COM_SAVE:
                 printf("\n %d writing raw... %d   ", free_index,
                     fwrite(tempsave[free_index].start, tempsave[free_index].length, 1, fp_jpg));
+                    // write(fp_jpg, tempsave[free_index].start, tempsave[free_index].length));
                 // sync();
 
             break;
@@ -107,6 +113,7 @@ int FinishJpgFile(void)
         case FINAL_COM_SAVE:
             printf("\n closed composed files. \n");
             fclose(fp_jpg);
+            // close(fp_jpg);
         break;
 
         case FINAL_SEP_SAVE:
@@ -321,7 +328,7 @@ int GenBmpFile(const unsigned char *pData, unsigned char bitCountPerPix, unsigne
         rgbd_c = fwrite(&rgbquad, sizeof(RGBQUAD), 256, fp);
     }
     fwrite(pData,filesize,1, fp);
-    sync();
+    // sync();
     fclose(fp);
  
     return 1;

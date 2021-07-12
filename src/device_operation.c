@@ -1,5 +1,7 @@
 #include "device_operation.h"
 #include "i2cbusses.h"
+#define buffer_v4l2 32
+
 void errno_exit(const char *s)
 {
     fprintf(stderr, "%s error %d, %s\n", s, errno, strerror(errno));
@@ -45,7 +47,7 @@ void init_mmap(void)
 
     CLEAR(req);
 
-    req.count = 4; // what is 4? the buffer size of frame to dynamically saved? do it related to n_buffers
+    req.count = buffer_v4l2; // what is 4? the buffer size of frame to dynamically saved? do it related to n_buffers
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory = V4L2_MEMORY_MMAP; // set the video mode as memory address mapping
 
@@ -64,7 +66,7 @@ void init_mmap(void)
         }
     }
 
-    if (req.count < 2) // request failure
+    if (req.count < buffer_v4l2) // request failure
     {
         fprintf(stderr, "Insufficient buffer memory on %s\\n",
                 dev_name);
@@ -462,7 +464,7 @@ void setRegExtMode(void)
 		{0x303F, 0x01}, // captured num frame(s) when trigger arrives
 		{0x302C, 0x00}, // confusing sleep period nums
 		{0x302F, 0x7F}, // confusing sleep period nums 2
-		{0x3823, 0x30}, // external timing setting
+		{0x3823, 0x00}, // external timing setting 30
 		{0x0100, 0x00}, // PLL model 0:software standby or 1:streaming
 		{0x3006, 0x0c}, // [1]:direction of fsin, [3]:strobe pin direction -- 0x04 
 		// {0x3023, 0x02}, // [1]:powermode of MIPI 
@@ -500,26 +502,28 @@ void setRegExtMode(void)
     if (ext_trg_enable)
     {
         printf("Trigger mode enabled, writing iic register.\n");
-        i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_WRITE_MODE);
-        i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
+        i2cReadWrite(11, 0x60, &regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_WRITE_MODE);
+        i2cReadWrite(11, 0x60, &regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
     }
     else if(vid_stream_enable)
     {
         printf("Stream mode enabled, writing iic register.\n");
-        i2cReadWrite(&regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_WRITE_MODE);
-        i2cReadWrite(&regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_READ_MODE);
+        i2cReadWrite(11, 0x60, &regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_WRITE_MODE);
+        i2cReadWrite(11, 0x60, &regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_READ_MODE);
     }
     
-    i2cReadWrite(&regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_WRITE_MODE);
-    i2cReadWrite(&regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_READ_MODE);
+    i2cReadWrite(11, 0x60, &regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_WRITE_MODE);
+    i2cReadWrite(11, 0x60, &regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_READ_MODE);
     
     
-    i2cReadWrite(&more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_READ_MODE);
-    i2cReadWrite(&more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_WRITE_MODE);
+    i2cReadWrite(11, 0x60, &more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_READ_MODE);
+    i2cReadWrite(11, 0x60, &more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_WRITE_MODE);
     
-    // usleep(10);
-        // i2cReadWrite(&regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
-    // exit(0);
+    struct R6fromA1 read_msg;
+    read_msg.reg = 0x08;
+    memset(&read_msg.data[0], 0, 6);
+
+    i2cRead6FromAdr1(1, 0x28, read_msg);
 }
 
 void stopCapturing(void) // stop the driver from streaming data
