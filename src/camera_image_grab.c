@@ -2,6 +2,7 @@
 #include "image_process.h"
 #include "device_operation.h"
 #include "camera_control.h"
+#include "i2cbusses.h"
 
 
 struct buffer *buffers;
@@ -65,7 +66,7 @@ static void process_image(const struct buffer *buf_img, int index_image)
 
 static int readFrame(void)
 {
-    printf("\n   /////////////////\n    READ FRAME\n");
+    printf("\n\n   /////////////////\n    READ FRAME\n");
     
     struct v4l2_buffer buf;
     unsigned int i, count;
@@ -115,8 +116,6 @@ static int readFrame(void)
                     while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process    
                     {   
                         uncatched++;
-                        // printf("there is no image availble yet, please wait .                  .. uncatched = %d \r", uncatched++);
-                        // usleep(1);
                     }
                    break;
 
@@ -128,21 +127,18 @@ static int readFrame(void)
                     errno_exit("VIDIOC_DQBUF");
                 }
             }
-            // if ((uncatched - uncatched_last) > UNCHATED_FILTER_VALUE) 
-            // {
-            //     printf("\nIgnore first frame after trig %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
-            // }
-            // else
+
             {
                 printf("normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
                 assert(buf.index < n_buffers);
                 process_image(&buffers[buf.index], count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
-                
+                printf("start transfer ... \n");
                 count ++;
+                if(spi_check_enable) SPI_transfer(count);
+
                 gettimeofday(&end, 0);
                 float sec_loop = ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6);
                 printf("num %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", count,sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********":" ");
-                
                 gettimeofday(&begin, 0);
             }
             
@@ -208,17 +204,21 @@ int main(int argc, char **argv)
     // cameraFunctionsControl(V4L2_CID_EXPOSURE_AUTO, 1);
     // cameraFunctionsControl(V4L2_CID_EXPOSURE_ABSOLUTE, 50);
     // enumerateExtendedControl();
+
+
     startCapturing();
     setRegExtMode();
     
     // if(show_image_enable)  SDL_display_init();
     if(show_image_enable) SDL_init();
     if(save_image_enable) StartJpgFile();
+    if(spi_check_enable)  SPI_Init();
 
     readFrame();
     stopCapturing();
     if(show_image_enable)  SDL_deinit();
     if(save_image_enable)  FinishJpgFile();
+    if(spi_check_enable)  SPI_Close();
 
     uninitDevice();
     closeDevice();

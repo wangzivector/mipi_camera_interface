@@ -28,6 +28,162 @@
 
 #include "i2cbusses.h"
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+static uint8_t bits = 8;
+static uint32_t speed = 500000;
+static int fd_spi;
+
+struct msg_header{
+	unsigned char data_type;
+	unsigned char data_size;
+	unsigned int  data_seq; 
+}msg_header;
+
+static void pabort(const char *s)
+{
+	perror(s);
+	abort();
+}
+
+int decode_spimsg_header(char *buff_rx, struct msg_header *header)
+{
+	char char_data;
+	unsigned char data_type, data_size = 0;
+	unsigned short data_seq_bin = 0;
+	if (buff_rx[0] != 0xAA)
+		return -1;
+	// printf("\n%x , %x , %x , %x\n",buff_rx[0], buff_rx[1], buff_rx[2], buff_rx[3]);
+	header->data_size = buff_rx[1] & 0x0F;
+	header->data_type = (buff_rx[1] & 0xF0) >> 4;
+	data_seq_bin = buff_rx[2];
+	header->data_seq = (data_seq_bin << 8) | buff_rx[3];
+	return header->data_size;
+}
+
+void SPI_transfer(int index)
+{
+	int ret, i;
+	unsigned short index_short = index;
+	uint8_t tx[] = {0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
+	struct msg_header header_msg;
+
+
+	uint8_t rx[ARRAY_SIZE(tx)] = {0, };
+	struct spi_ioc_transfer tr = {
+		.tx_buf = (unsigned long)tx,
+		.rx_buf = (unsigned long)rx,
+		.len = ARRAY_SIZE(tx),
+		.delay_usecs = 0,
+		.speed_hz = speed,
+		.bits_per_word = bits,
+	};
+
+	uint8_t rx_tm[ARRAY_SIZE(tx)] = {0, };
+	uint8_t tx_tm[] = {0xBB, 0xBB, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
+	struct spi_ioc_transfer tr_tm = {
+		.tx_buf = (unsigned long)tx_tm,
+		.rx_buf = (unsigned long)rx_tm,
+		.len = ARRAY_SIZE(tx_tm),
+		.delay_usecs = 0,
+		.speed_hz = speed,
+		.bits_per_word = bits,
+	};
+
+	ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr);
+	if (ret < 1)
+		pabort("can't send spi message");
+	printf("transfer buffer finished: \n");
+	for (ret = 0; ret < ARRAY_SIZE(tx); ret++) {
+		printf("%.2X ", rx[ret]);
+	}
+	
+	if (-1 == decode_spimsg_header(rx, &header_msg))
+		printf("fail decode spi message");
+	else{
+		printf("DATA type:%d , seqe:%d , size:%d \n", header_msg.data_type, header_msg.data_seq, header_msg.data_size);
+		for(i = 0; i < header_msg.data_size; i+=4)
+		{
+			// tr.tx_buf = (unsigned long)(0xAA);
+			// rx[0] = (unsigned long)(0x00);
+			// tr.rx_buf = (unsigned long)rx;
+			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr_tm);
+			if (ret < 1)
+				printf("can not receive session %d receive msg %d .\n", index, i);
+			else
+				printf("session %d receive msg %d .\n", index, i);
+
+			for (ret = 0; ret < ARRAY_SIZE(tx_tm); ret++) {
+				printf("%X", rx_tm[ret]);
+			}
+		}
+	}
+	printf("\n transfer session done!\n");
+}
+
+
+int SPI_Init(void)
+{
+	static const char *device = "/dev/spidev0.0";
+	static uint8_t mode;
+	int ret;
+	
+	fd_spi = open(device, O_RDWR);
+	if (fd_spi < 0)
+		pabort("can't open device");
+
+	/*
+	 * spi mode
+	 */
+	ret = ioctl(fd_spi, SPI_IOC_WR_MODE, &mode);
+	if (ret == -1)
+		pabort("can't set spi mode");
+
+	ret = ioctl(fd_spi, SPI_IOC_RD_MODE, &mode);
+	if (ret == -1)
+		pabort("can't get spi mode");
+
+	/*
+	 * bits per word
+	 */
+	ret = ioctl(fd_spi, SPI_IOC_WR_BITS_PER_WORD, &bits);
+	if (ret == -1)
+		pabort("can't set bits per word");
+
+	ret = ioctl(fd_spi, SPI_IOC_RD_BITS_PER_WORD, &bits);
+	if (ret == -1)
+		pabort("can't get bits per word");
+
+	/*
+	 * max speed hz
+	 */
+	ret = ioctl(fd_spi, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+	if (ret == -1)
+		pabort("can't set max speed hz");
+
+	ret = ioctl(fd_spi, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
+	if (ret == -1)
+		pabort("can't get max speed hz");
+
+	printf("spi mode: %d\n", mode);
+	printf("bits per word: %d\n", bits);
+	printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
+
+	// SPI_transfer();
+	
+}
+
+int SPI_Close(void)
+{
+	close(fd_spi);
+}
+
+
+
+
+////////
+////////  IIC
+////////
+
 
 int open_i2c_dev(int i2cbus, char *filename, size_t size, int quiet)
 {
@@ -214,7 +370,7 @@ int i2cRead6FromAdr1(int i2cbus, unsigned char bus_address, struct R6fromA1 read
 	exit(1);
 }
 
-int i2cReadWrite(int i2cbus, unsigned char bus_address, struct reg regs[], int n_reg, enum i2c_dir dir)
+int i2cReadWrite(int i2cbus, unsigned char bus_address, struct reg *regs, int n_reg, enum i2c_dir dir)
 {
 	int i, j;
 	char filename[20];

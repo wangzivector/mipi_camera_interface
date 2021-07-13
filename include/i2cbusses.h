@@ -2,6 +2,8 @@
 #define _I2CBUSSES_H
 
 #include <unistd.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>	/* for NAME_MAX */
@@ -12,11 +14,10 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+#include <linux/spi/spidev.h>
 
 
 enum parse_state {
@@ -47,11 +48,17 @@ struct R6fromA1 {
 #define PRINT_WRITE_BUF	(1 << 2)
 #define PRINT_HEADER	(1 << 3)
 
-
+// i2c
 int open_i2c_dev(int i2cbus, char *filename, size_t size, int quiet);
 int set_slave_addr(int file, int address, int force);
-int i2cReadWrite(int i2cbus, unsigned char bus_address, struct reg regs[], int n_reg, enum i2c_dir dir);
+int i2cReadWrite(int i2cbus, unsigned char bus_address, struct reg *regs, int n_reg, enum i2c_dir dir);
 int i2cRead6FromAdr1(int i2cbus, unsigned char bus_address, struct R6fromA1 read_msg);
+
+//spi
+int SPI_Close(void);
+int SPI_Init(void);
+void SPI_transfer(int index);
+
 
 
 #define MISSING_FUNC_FMT	"Error: Adapter does not have %s capability\n"

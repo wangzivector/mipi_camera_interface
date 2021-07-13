@@ -14,6 +14,7 @@ int save_image_enable = 0;
 int show_image_enable = 0;
 int ext_trg_enable = 0;
 int vid_stream_enable = 0;
+int spi_check_enable = 0;
 
 char *save_folder = "./image/";
 char *dev_name = "/dev/video0";
@@ -32,7 +33,7 @@ void option_usage(FILE *fp, int argc, char **argv)
             "-h | --help          Print this message\n"
             "-m | --mmap          Use memory mapped buffers [default]\n"
             "-d | --display       iamge show_image_enable\n"
-            "-u | --userp         Use application allocated buffers\n"
+            "-p | --spi           spi check enable\n"
             "-e | --external      outer trigger mode \n"
             "-v | --video         video stream mode, not external trigger\n"
             "-f | --force         force set video format,like rgb and resolution\n"
@@ -44,7 +45,7 @@ void option_usage(FILE *fp, int argc, char **argv)
 int set_option(int argc, char **argv)
 {
 
-const char short_options[] = "shmduevfc:";
+const char short_options[] = "shmdpevfc:";
 
 const struct option
     long_options[] = {
@@ -52,7 +53,7 @@ const struct option
         {"help", no_argument, NULL, 'h'},
         {"mmap", no_argument, NULL, 'm'},
         {"disp", no_argument, NULL, 'd'},
-        {"userp", no_argument, NULL, 'u'},
+        {"spi", no_argument, NULL, 'p'},
         {"external", no_argument, NULL, 'e'},
         {"video", no_argument, NULL, 'v'},
         {"force", no_argument, NULL, 'f'},
@@ -92,8 +93,8 @@ const struct option
             show_image_enable = 1;
             break;
 
-        case 'u':
-            io = IO_METHOD_USERPTR;
+        case 'p':
+            spi_check_enable = 1;
             break;
 
         case 'e':

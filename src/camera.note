@@ -127,8 +127,8 @@ pi@raspberrypi:~ $ i2ctransfer -f -y 1 w2@0x28 0x3f 0x80
 head[4 bytes] + data[4n bytes] n>=0
 
 msg{
-	head[0:4]{
-		headmark[0] == b01010101
+	head[0:3]{
+		headmark[0] == b'0101 0101
 		Byte [1] - [datatype[4 bits] : datasize[4 bits]] = 4*n
 		Byte [2:3] - sequence / num <unsigned short>
 	}

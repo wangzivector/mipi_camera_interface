@@ -502,28 +502,27 @@ void setRegExtMode(void)
     if (ext_trg_enable)
     {
         printf("Trigger mode enabled, writing iic register.\n");
-        i2cReadWrite(11, 0x60, &regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_WRITE_MODE);
-        i2cReadWrite(11, 0x60, &regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
+        i2cReadWrite(11, 0x60, regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_WRITE_MODE);
+        i2cReadWrite(11, 0x60, regs_trigger, sizeof(regs_trigger)/sizeof(struct reg), I2C_READ_MODE);
     }
     else if(vid_stream_enable)
     {
         printf("Stream mode enabled, writing iic register.\n");
-        i2cReadWrite(11, 0x60, &regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_WRITE_MODE);
-        i2cReadWrite(11, 0x60, &regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_READ_MODE);
+        i2cReadWrite(11, 0x60, regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_WRITE_MODE);
+        i2cReadWrite(11, 0x60, regs_stream, sizeof(regs_stream)/sizeof(struct reg), I2C_READ_MODE);
     }
     
-    i2cReadWrite(11, 0x60, &regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_WRITE_MODE);
-    i2cReadWrite(11, 0x60, &regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_READ_MODE);
+    i2cReadWrite(11, 0x60, regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_WRITE_MODE);
+    i2cReadWrite(11, 0x60, regs_GainExpose, sizeof(regs_GainExpose)/sizeof(struct reg), I2C_READ_MODE);
     
     
-    i2cReadWrite(11, 0x60, &more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_READ_MODE);
-    i2cReadWrite(11, 0x60, &more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_WRITE_MODE);
+    i2cReadWrite(11, 0x60, more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_READ_MODE);
+    i2cReadWrite(11, 0x60, more_regs, sizeof(more_regs)/sizeof(struct reg), I2C_WRITE_MODE);
     
-    struct R6fromA1 read_msg;
-    read_msg.reg = 0x08;
-    memset(&read_msg.data[0], 0, 6);
-
-    i2cRead6FromAdr1(1, 0x28, read_msg);
+    // struct R6fromA1 read_msg;
+    // read_msg.reg = 0x08;
+    // memset(&read_msg.data[0], 0, 6);
+    // i2cRead6FromAdr1(1, 0x28, read_msg);
 }
 
 void stopCapturing(void) // stop the driver from streaming data
