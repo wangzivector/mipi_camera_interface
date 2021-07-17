@@ -20,7 +20,6 @@ char *save_folder = "./image/";
 char *dev_name = "/dev/video0";
 
 enum io_method io = IO_METHOD_MMAP;
-// enum io_method io = IO_METHOD_READ;
 
 
 void option_usage(FILE *fp, int argc, char **argv)

@@ -26,11 +26,13 @@
 #define _BSD_SOURCE 1 /* for glibc <= 2.19 */
 #define _DEFAULT_SOURCE 1 /* for glibc >= 2.19 */
 
+#include <pigpio.h>
 #include "i2cbusses.h"
 
+#define SPI_PIN 5
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 static uint8_t bits = 8;
-static uint32_t speed = 500000;
+static uint32_t speed = 450000;
 static int fd_spi;
 
 struct msg_header{
@@ -39,10 +41,23 @@ struct msg_header{
 	unsigned int  data_seq; 
 }msg_header;
 
-static void pabort(const char *s)
+struct sync_index sync_obj;
+
+inline static void pabort(const char *s)
 {
 	perror(s);
 	abort();
+}
+
+int GPIO_init(unsigned char Pin_num,unsigned char mode)
+{
+	gpioSetMode(Pin_num, mode);
+	return 0;
+}
+
+int GPIO_read(unsigned char Pin_num)
+{
+	return gpioRead(Pin_num);
 }
 
 int decode_spimsg_header(char *buff_rx, struct msg_header *header)
@@ -50,7 +65,10 @@ int decode_spimsg_header(char *buff_rx, struct msg_header *header)
 	char char_data;
 	unsigned char data_type, data_size = 0;
 	unsigned short data_seq_bin = 0;
-	if (buff_rx[0] != 0xAA)
+	int ret;
+	// for (ret = 0; ret < 4; ret++) printf("%.2X ", buff_rx[ret]);
+	// printf("//\n");
+	if (buff_rx[0] != 0xAA) // for test
 		return -1;
 	// printf("\n%x , %x , %x , %x\n",buff_rx[0], buff_rx[1], buff_rx[2], buff_rx[3]);
 	header->data_size = buff_rx[1] & 0x0F;
@@ -60,10 +78,10 @@ int decode_spimsg_header(char *buff_rx, struct msg_header *header)
 	return header->data_size;
 }
 
-void SPI_transfer(int index)
+void SPI_transfer(unsigned int *index)
 {
 	int ret, i;
-	unsigned short index_short = index;
+	unsigned short index_short = *index;
 	uint8_t tx[] = {0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
 	struct msg_header header_msg;
 
@@ -101,11 +119,17 @@ void SPI_transfer(int index)
 		printf("fail decode spi message");
 	else{
 		printf("DATA type:%d , seqe:%d , size:%d \n", header_msg.data_type, header_msg.data_seq, header_msg.data_size);
+
+		if (header_msg.data_seq == *index)
+		{
+			printf("correct index:%d.\n", header_msg.data_seq);		
+		}
+		else{
+			printf("wrong index !, match then and leave.\n");
+			*index = header_msg.data_seq;
+		}
 		for(i = 0; i < header_msg.data_size; i+=4)
 		{
-			// tr.tx_buf = (unsigned long)(0xAA);
-			// rx[0] = (unsigned long)(0x00);
-			// tr.rx_buf = (unsigned long)rx;
 			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr_tm);
 			if (ret < 1)
 				printf("can not receive session %d receive msg %d .\n", index, i);
@@ -119,6 +143,102 @@ void SPI_transfer(int index)
 	}
 	printf("\n transfer session done!\n");
 }
+
+void *Mlt_SPI_transfer(void *none)
+{
+	int ret, i, offset_index = 0;
+	unsigned short index_short = 0;
+	struct msg_header header_msg;
+
+	uint8_t tx[] = {0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF),0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF),0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
+	uint8_t rx[ARRAY_SIZE(tx)] = {0, };
+
+	struct spi_ioc_transfer tr = {
+		.tx_buf = (unsigned long)tx,
+		.rx_buf = (unsigned long)rx,
+		.len = ARRAY_SIZE(tx),
+		.delay_usecs = 0,
+		.speed_hz = speed,
+		.bits_per_word = bits,
+	};
+
+	uint8_t tx_tm[] = {0xBB, 0xBB, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
+	uint8_t rx_tm[ARRAY_SIZE(tx)] = {0, };
+	struct spi_ioc_transfer tr_tm = {
+		.tx_buf = (unsigned long)tx_tm,
+		.rx_buf = (unsigned long)rx_tm,
+		.len = ARRAY_SIZE(tx_tm),
+		.delay_usecs = 0,
+		.speed_hz = speed,
+		.bits_per_word = bits,
+	};
+
+	while(1){
+		index_short = 0xCCDD;
+		tx[2] = (index_short & 0xFF00) >> 8;
+		tx[3] = (index_short & 0x00FF);
+		// printf("GPIO_read(SPI_PIN)%d \n", GPIO_read(SPI_PIN));
+		
+		if(GPIO_read(SPI_PIN) == 1)
+			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr);
+		else
+		{
+			usleep(10);
+			continue;
+		}
+		
+		if (ret < 1)
+			pabort("can't send spi message");
+		
+		if (-1 == decode_spimsg_header(rx, &header_msg))
+		{
+			// continue;
+		}
+		printf("all - transfer buffer finished: \n");
+
+		printf("\n\n                                                                       ++++++ header : ");
+		for (ret = 0; ret < ARRAY_SIZE(tx); ret++)
+			printf("%.2X ", rx[ret]);
+		printf("\nDATA type:%d , seq:%d , size:%d \n", header_msg.data_type, header_msg.data_seq, header_msg.data_size);
+		// if (header_msg.data_seq == index_short) printf("correct index:%d.\n", header_msg.data_seq);		
+		// else printf("wrong index %d with %d!, match then and leave.\n", index_short = header_msg.data_seq, index_short);
+		index_short = header_msg.data_seq;
+		for(i = 0; i < header_msg.data_size; i+=4)
+		{
+			tx_tm[2] = (index_short & 0xFF00) >> 8;
+			tx_tm[3] = (index_short & 0x00FF);
+			// usleep(100);
+			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr_tm);
+			if (ret < 1)
+				printf("can not receive session %d receive msg %d .\n", index, i);
+			else
+				printf("session %d receive msg %d .\n", index, i);
+			
+			printf("\n\n                                                                  ------ ");
+			for (ret = 0; ret < ARRAY_SIZE(tx_tm); ret++)
+				printf("%.2X ", rx_tm[ret]);
+		}
+		printf("\n");
+		
+		// mark time and index, then compare with video index
+		
+		if ((sync_obj.index_trigger + offset_index) == sync_obj.index_video)
+		{
+			printf("last video and trigger index %d match up! with time bias: video-trigger= %d ms.\n", sync_obj.index_video,
+				(sync_obj.ts_video.tv_sec- sync_obj.ts_trigger.tv_sec)*1000 + (sync_obj.ts_video.tv_nsec- sync_obj.ts_trigger.tv_nsec)/1000000);
+		}
+		else {
+			printf("mismatch video and trigger index! with index bias: video%d-trigger%d = %d, but offset_index is %d, bind them!\n",
+				sync_obj.index_video, sync_obj.index_trigger, sync_obj.index_video - sync_obj.index_trigger, offset_index);
+			// offset_index = sync_obj.index_video - sync_obj.index_trigger;
+		}
+
+		sync_obj.index_trigger = index_short;
+		clock_gettime(CLOCK_REALTIME, &sync_obj.ts_trigger);
+		printf("\n transfer session done!\n");
+	} 
+}
+
 
 
 int SPI_Init(void)
@@ -168,12 +288,19 @@ int SPI_Init(void)
 	printf("bits per word: %d\n", bits);
 	printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
 
+	printf("GPIO Init\n");
+
+	if(gpioInitialise() < 0)
+		pabort("wrong  gpioInitialise() !");
+	// usleep(10000);
+	GPIO_init(SPI_PIN, PI_INPUT);
 	// SPI_transfer();
 	
 }
 
 int SPI_Close(void)
 {
+	gpioTerminate();
 	close(fd_spi);
 }
 

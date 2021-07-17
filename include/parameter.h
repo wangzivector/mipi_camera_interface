@@ -38,7 +38,6 @@ enum io_method
 extern struct buffer *buffers;
 extern struct timeval tv;
 
-
 extern int fd;
 extern unsigned int i, n_buffers;
 extern char out_name[256];

@@ -19,7 +19,7 @@ unsigned int i, n_buffers;
 // static void process_image(const void *pic_buffer, int size, int index_image, enum process_mode mdoe)
 static void process_image(const struct buffer *buf_img, int index_image)
 {
-
+//////////////////////////////////////////////////////////////////////////////////////
     // printf("\r\n   /////////////////\n    PROCESSING IMAGE\n");
     printf("\rimage size is : %d  ", buf_img->length);
     switch (buf_img->length/(frame_width*frame_height))
@@ -80,6 +80,7 @@ static int readFrame(void)
     {
         switch (io)
         {
+//////////////////////////////////////////////////////////////////////////////////////
         case IO_METHOD_READ:
             if (-1 == read(fd, buffers[0].start, buffers[0].length))
             {
@@ -102,6 +103,8 @@ static int readFrame(void)
             process_image(&buffers[0], count);
             break;
 
+// IO_METHOD_MMAP
+//////////////////////////////////////////////////////////////////////////////////////
         case IO_METHOD_MMAP: // default mode
             CLEAR(buf);
 
@@ -113,10 +116,8 @@ static int readFrame(void)
                 switch (errno)
                 {
                 case EAGAIN:
-                    while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process    
-                    {   
+                    while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process 
                         uncatched++;
-                    }
                    break;
 
                 case EIO:
@@ -128,24 +129,26 @@ static int readFrame(void)
                 }
             }
 
-            {
-                printf("normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
-                assert(buf.index < n_buffers);
-                process_image(&buffers[buf.index], count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
-                printf("start transfer ... \n");
-                count ++;
-                if(spi_check_enable) SPI_transfer(count);
+            printf("normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
+            assert(buf.index < n_buffers);
+            process_image(&buffers[buf.index], count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
+            // printf("start transfer ... \n");
+            count ++;
+            
+            sync_obj.index_video = count;
+            clock_gettime(CLOCK_REALTIME, &sync_obj.ts_video);
 
-                gettimeofday(&end, 0);
-                float sec_loop = ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6);
-                printf("num %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", count,sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********":" ");
-                gettimeofday(&begin, 0);
-            }
+            gettimeofday(&end, 0);
+            float sec_loop = ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6);
+            printf("num %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", count,sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********" : "");
+            gettimeofday(&begin, 0);
             
             if(buf.bytesused == 0) continue;
             if (-1 == xioctl(fd, VIDIOC_QBUF, &buf)) // after processing the image data, put the buffer container back query to stream video
                 errno_exit("VIDIOC_QBUF");
             break;
+
+//////////////////////////////////////////////////////////////////////////////////////
 
         case IO_METHOD_USERPTR:
             CLEAR(buf);
@@ -193,6 +196,7 @@ static int readFrame(void)
 
 int main(int argc, char **argv)
 {
+    pthread_t pt_thre;
     set_option(argc, argv); 
     openDevice();
     initDevice();
@@ -205,7 +209,6 @@ int main(int argc, char **argv)
     // cameraFunctionsControl(V4L2_CID_EXPOSURE_ABSOLUTE, 50);
     // enumerateExtendedControl();
 
-
     startCapturing();
     setRegExtMode();
     
@@ -213,6 +216,7 @@ int main(int argc, char **argv)
     if(show_image_enable) SDL_init();
     if(save_image_enable) StartJpgFile();
     if(spi_check_enable)  SPI_Init();
+    if(spi_check_enable) pthread_create(&pt_thre, NULL, Mlt_SPI_transfer, NULL); // spi thread here
 
     readFrame();
     stopCapturing();

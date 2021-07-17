@@ -19,6 +19,7 @@
 #include <linux/i2c-dev.h>
 #include <linux/spi/spidev.h>
 
+#include <pthread.h>
 
 enum parse_state {
 	PARSE_GET_DESC,
@@ -41,7 +42,15 @@ struct R6fromA1 {
     unsigned int seq;
 };
 
+struct sync_index
+{
+    long index_video;
+    struct timespec ts_video;
+    long index_trigger;
+    struct timespec ts_trigger;
+} sync_index;
 
+extern struct sync_index sync_obj;
 
 #define PRINT_STDERR	(1 << 0)
 #define PRINT_READ_BUF	(1 << 1)
@@ -57,7 +66,8 @@ int i2cRead6FromAdr1(int i2cbus, unsigned char bus_address, struct R6fromA1 read
 //spi
 int SPI_Close(void);
 int SPI_Init(void);
-void SPI_transfer(int index);
+void SPI_transfer(unsigned int *index);
+void *Mlt_SPI_transfer(void *none);
 
 
 
