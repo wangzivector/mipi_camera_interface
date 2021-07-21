@@ -35,6 +35,8 @@ static uint8_t bits = 8;
 static uint32_t speed = 450000;
 static int fd_spi;
 
+FILE *fpWrite_txt;
+
 struct msg_header{
 	unsigned char data_type;
 	unsigned char data_size;
@@ -59,6 +61,211 @@ int GPIO_read(unsigned char Pin_num)
 {
 	return gpioRead(Pin_num);
 }
+
+int Start_file_txt(void)
+{
+	int state = 0;
+	fpWrite_txt = fopen("VINS_log_data.txt", "w");
+	printf("== START DATA == write state code: %d \n", fpWrite_txt);
+	if(fpWrite_txt == NULL) return -1;
+	
+	fprintf(fpWrite_txt, "== START DATA ==\n");
+	sync_obj.imgts_count = 0;
+	// fclose(fpWrite_txt);
+	return 0;
+}
+
+int Close_file_txt(void)
+{
+	usleep(1000*10);
+	if(fpWrite_txt == NULL) return -1;
+	fprintf(fpWrite_txt, "== END DATA ==\n");
+	fclose(fpWrite_txt);
+
+	printf("Closing file txt ... with image %d and imgts %d\n", sync_obj.img_count, sync_obj.imgts_count);
+	return 0;
+}
+
+int write_image_header(unsigned short seq_num, unsigned int timestamp)
+{
+	if(fpWrite_txt == NULL) return -1;
+	
+	fprintf(fpWrite_txt, "%010d   IMG  nameofimagedata                              seqnum %05d\n",
+	   timestamp, seq_num);
+	return 0;
+}
+
+int write_imu_meas(unsigned short seq_num, unsigned int timestamp, short *data_arr)
+{
+	if(fpWrite_txt == NULL) return -1;
+	
+	fprintf(fpWrite_txt, "%010d   IMU  %06d %06d %06d   %06d %06d %06d  seqnum %05d\n", timestamp, 
+	    data_arr[0], data_arr[1], data_arr[2], data_arr[3], data_arr[4], data_arr[5], seq_num);
+	return 0;
+}
+
+int decode_msg(char *buff_rx)
+{
+	int i, type_size, incre_num = 0;
+	int idex_imu = 0;
+	void *link_data;
+	char single_save_flag = 0; 
+	unsigned short img_seq_num;
+	unsigned int img_timestamp;
+	unsigned short imu_seq_num;
+	unsigned int imu_timestamp;
+	short data_imu[6];
+
+	if ((buff_rx[72+6] == 0x01)&&(buff_rx[73+6] == 0x02)&&(buff_rx[74+6] == 0x03)&&
+		(buff_rx[75+6] == 0x04)&&(buff_rx[76+6] == 0x05)&&(buff_rx[77+6] == 0x06)) // for test
+	{
+		Start_file_txt();
+		return 0;
+	}
+
+	if((buff_rx[72+6] == 0xfe)&&(buff_rx[73+6] == 0xdc)&&(buff_rx[74+6] == 0xba)&&
+		(buff_rx[75+6] == 0x98)&&(buff_rx[76+6] == 0x76)&&(buff_rx[77+6] == 0x54)) // for debug you might take it as CRC
+	{
+		// image header 
+		link_data = &img_seq_num; type_size = 2;       memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
+		link_data = &img_timestamp; type_size = 4;     memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
+		single_save_flag = 0;
+		printf("++image timestamp :%d  seq:%d \n", img_timestamp, img_seq_num);	
+		
+		for(idex_imu = 0; idex_imu < 4; idex_imu ++)
+		{
+			// imu meas
+			link_data = &imu_seq_num; type_size = 2;       memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
+			link_data = &imu_timestamp; type_size = 4;     memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
+			link_data = &data_imu; type_size = 12;     	   memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
+			if (imu_timestamp != 0)
+			{
+				if ((img_timestamp < imu_timestamp) && (single_save_flag == 0))
+				{	
+					write_image_header(img_seq_num, img_timestamp);
+					single_save_flag = 1;
+				}
+				
+				write_imu_meas(imu_seq_num, imu_timestamp, data_imu);
+				printf("--IMU timestamp :%d  seq:%d --IMU data: ", imu_timestamp, imu_seq_num);
+				for(i = 0; i < 6; i++) printf("%d ", data_imu[i]);	printf("\n");
+			}else break;
+		}
+		
+		if(single_save_flag == 0)
+			write_image_header(img_seq_num, img_timestamp);
+		
+		return idex_imu;
+	}
+	return -1;
+}
+
+
+void *Mlt_SPI_transfer(void *none)
+{
+	int ret, i, offset_index = 0;
+	unsigned short index_short = 0;
+	struct msg_header header_msg;
+
+	uint8_t tx[84] = {0x11};
+	uint8_t rx[ARRAY_SIZE(tx)] = {0, };
+
+	struct spi_ioc_transfer tr = {
+		.tx_buf = (unsigned long)tx,
+		.rx_buf = (unsigned long)rx,
+		.len = ARRAY_SIZE(tx),
+		.delay_usecs = 0,
+		.speed_hz = speed,
+		.bits_per_word = bits,
+	};
+
+	uint8_t tx_tm[] = {0xBB, 0xBB, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
+	uint8_t rx_tm[ARRAY_SIZE(tx)] = {0, };
+	struct spi_ioc_transfer tr_tm = {
+		.tx_buf = (unsigned long)tx_tm,
+		.rx_buf = (unsigned long)rx_tm,
+		.len = ARRAY_SIZE(tx_tm),
+		.delay_usecs = 0,
+		.speed_hz = speed,
+		.bits_per_word = bits,
+	};
+	sync_obj.SPI_enable = 1;
+
+	while(sync_obj.SPI_enable){
+
+		// index_short = 0xCCDD;
+		// tx[2] = (index_short & 0xFF00) >> 8;
+		// tx[3] = (index_short & 0x00FF);
+		// printf("GPIO_read(SPI_PIN)%d \n", GPIO_read(SPI_PIN));
+		
+		if(GPIO_read(SPI_PIN) == 1)
+			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr);
+		else
+		{
+			usleep(100);
+			continue;
+		}
+		
+		if (ret < 1)
+			pabort("can't send spi message");
+		
+		if (decode_msg(rx) > 0)
+		{
+			sync_obj.imgts_count ++;
+			// continue;
+		}
+
+		printf("SPI %d transfer buffer finished: \n", sync_obj.imgts_count);
+		for (ret = 0; ret < ARRAY_SIZE(tx); ret++)
+		{
+			printf("%.2X ", rx[ret]);
+			if ((ret+1)%6 == 0) printf("\n");
+		}
+
+		// printf("DATA type:%d , seq:%d , size:%d \n", header_msg.data_type, header_msg.data_seq, header_msg.data_size);
+
+		// if (header_msg.data_seq == index_short) printf("correct index:%d.\n", header_msg.data_seq);		
+		// else printf("wrong index %d with %d!, match then and leave.\n", index_short = header_msg.data_seq, index_short);
+
+		// index_short = header_msg.data_seq;
+		// for(i = 0; i < header_msg.data_size; i+=4)
+		// {
+		// 	tx_tm[2] = (index_short & 0xFF00) >> 8;
+		// 	tx_tm[3] = (index_short & 0x00FF);
+		// 	// usleep(100);
+		// 	ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr_tm);
+		// 	if (ret < 1)
+		// 		printf("can not receive session %d receive msg %d .\n", index, i);
+		// 	else
+		// 		printf("session %d receive msg %d .\n", index, i);
+			
+		// 	printf("\n\n                                                                  ------ ");
+		// 	for (ret = 0; ret < ARRAY_SIZE(tx_tm); ret++)
+		// 		printf("%.2X ", rx_tm[ret]);
+		// }
+		// printf("\n");
+		
+		// // mark time and index, then compare with video index
+		
+		// if ((sync_obj.index_trigger + offset_index) == sync_obj.index_video)
+		// {
+		// 	printf("last video and trigger index %d match up! with time bias: video-trigger= %d ms.\n", sync_obj.index_video,
+		// 		(sync_obj.ts_video.tv_sec- sync_obj.ts_trigger.tv_sec)*1000 + (sync_obj.ts_video.tv_nsec- sync_obj.ts_trigger.tv_nsec)/1000000);
+		// }
+		// else {
+		// 	printf("mismatch video and trigger index! with index bias: video%d-trigger%d = %d, but offset_index is %d, bind them!\n",
+		// 		sync_obj.index_video, sync_obj.index_trigger, sync_obj.index_video - sync_obj.index_trigger, offset_index);
+		// 	// offset_index = sync_obj.index_video - sync_obj.index_trigger;
+		// }
+
+		// sync_obj.index_trigger = index_short;
+		// clock_gettime(CLOCK_REALTIME, &sync_obj.ts_trigger);
+		// printf("\n transfer session done!\n");
+	} 
+	return 0;
+}
+
+
 
 int decode_spimsg_header(char *buff_rx, struct msg_header *header)
 {
@@ -117,7 +324,7 @@ void SPI_transfer(unsigned int *index)
 	
 	if (-1 == decode_spimsg_header(rx, &header_msg))
 		printf("fail decode spi message");
-	else{
+	else{	
 		printf("DATA type:%d , seqe:%d , size:%d \n", header_msg.data_type, header_msg.data_seq, header_msg.data_size);
 
 		if (header_msg.data_seq == *index)
@@ -144,109 +351,13 @@ void SPI_transfer(unsigned int *index)
 	printf("\n transfer session done!\n");
 }
 
-void *Mlt_SPI_transfer(void *none)
-{
-	int ret, i, offset_index = 0;
-	unsigned short index_short = 0;
-	struct msg_header header_msg;
-
-	uint8_t tx[] = {0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF),0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF),0xAA, 0xAA, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
-	uint8_t rx[ARRAY_SIZE(tx)] = {0, };
-
-	struct spi_ioc_transfer tr = {
-		.tx_buf = (unsigned long)tx,
-		.rx_buf = (unsigned long)rx,
-		.len = ARRAY_SIZE(tx),
-		.delay_usecs = 0,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
-
-	uint8_t tx_tm[] = {0xBB, 0xBB, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
-	uint8_t rx_tm[ARRAY_SIZE(tx)] = {0, };
-	struct spi_ioc_transfer tr_tm = {
-		.tx_buf = (unsigned long)tx_tm,
-		.rx_buf = (unsigned long)rx_tm,
-		.len = ARRAY_SIZE(tx_tm),
-		.delay_usecs = 0,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
-
-	while(1){
-		index_short = 0xCCDD;
-		tx[2] = (index_short & 0xFF00) >> 8;
-		tx[3] = (index_short & 0x00FF);
-		// printf("GPIO_read(SPI_PIN)%d \n", GPIO_read(SPI_PIN));
-		
-		if(GPIO_read(SPI_PIN) == 1)
-			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr);
-		else
-		{
-			usleep(10);
-			continue;
-		}
-		
-		if (ret < 1)
-			pabort("can't send spi message");
-		
-		if (-1 == decode_spimsg_header(rx, &header_msg))
-		{
-			// continue;
-		}
-		printf("all - transfer buffer finished: \n");
-
-		printf("\n\n                                                                       ++++++ header : ");
-		for (ret = 0; ret < ARRAY_SIZE(tx); ret++)
-			printf("%.2X ", rx[ret]);
-		printf("\nDATA type:%d , seq:%d , size:%d \n", header_msg.data_type, header_msg.data_seq, header_msg.data_size);
-		// if (header_msg.data_seq == index_short) printf("correct index:%d.\n", header_msg.data_seq);		
-		// else printf("wrong index %d with %d!, match then and leave.\n", index_short = header_msg.data_seq, index_short);
-		index_short = header_msg.data_seq;
-		for(i = 0; i < header_msg.data_size; i+=4)
-		{
-			tx_tm[2] = (index_short & 0xFF00) >> 8;
-			tx_tm[3] = (index_short & 0x00FF);
-			// usleep(100);
-			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr_tm);
-			if (ret < 1)
-				printf("can not receive session %d receive msg %d .\n", index, i);
-			else
-				printf("session %d receive msg %d .\n", index, i);
-			
-			printf("\n\n                                                                  ------ ");
-			for (ret = 0; ret < ARRAY_SIZE(tx_tm); ret++)
-				printf("%.2X ", rx_tm[ret]);
-		}
-		printf("\n");
-		
-		// mark time and index, then compare with video index
-		
-		if ((sync_obj.index_trigger + offset_index) == sync_obj.index_video)
-		{
-			printf("last video and trigger index %d match up! with time bias: video-trigger= %d ms.\n", sync_obj.index_video,
-				(sync_obj.ts_video.tv_sec- sync_obj.ts_trigger.tv_sec)*1000 + (sync_obj.ts_video.tv_nsec- sync_obj.ts_trigger.tv_nsec)/1000000);
-		}
-		else {
-			printf("mismatch video and trigger index! with index bias: video%d-trigger%d = %d, but offset_index is %d, bind them!\n",
-				sync_obj.index_video, sync_obj.index_trigger, sync_obj.index_video - sync_obj.index_trigger, offset_index);
-			// offset_index = sync_obj.index_video - sync_obj.index_trigger;
-		}
-
-		sync_obj.index_trigger = index_short;
-		clock_gettime(CLOCK_REALTIME, &sync_obj.ts_trigger);
-		printf("\n transfer session done!\n");
-	} 
-}
-
-
 
 int SPI_Init(void)
 {
 	static const char *device = "/dev/spidev0.0";
 	static uint8_t mode;
 	int ret;
-	
+	// Start_file_txt();
 	fd_spi = open(device, O_RDWR);
 	if (fd_spi < 0)
 		pabort("can't open device");
@@ -300,6 +411,7 @@ int SPI_Init(void)
 
 int SPI_Close(void)
 {
+	Close_file_txt();
 	gpioTerminate();
 	close(fd_spi);
 }

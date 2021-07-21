@@ -111,7 +111,7 @@ int FinishJpgFile(void)
         case MIDDLE_COM_SAVE:
         // break;
         case FINAL_COM_SAVE:
-            printf("\n closed composed files. \n");
+            printf("\nClosed composed files. \n");
             fclose(fp_jpg);
             // close(fp_jpg);
         break;

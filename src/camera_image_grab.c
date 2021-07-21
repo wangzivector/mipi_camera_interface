@@ -4,7 +4,6 @@
 #include "camera_control.h"
 #include "i2cbusses.h"
 
-
 struct buffer *buffers;
 struct timeval tv;
 
@@ -69,14 +68,14 @@ static int readFrame(void)
     printf("\n\n   /////////////////\n    READ FRAME\n");
     
     struct v4l2_buffer buf;
-    unsigned int i, count;
+    unsigned int i;
     struct timeval begin, end;
     int uncatched_last, uncatched = 0;
     gettimeofday(&begin, 0);
     uncatched = 0;
     uncatched_last = 0;
-
-    for (count = 0; count < frame_count; count)
+    sync_obj.img_count = 0;
+    for (sync_obj.img_count = 0; sync_obj.img_count < frame_count; sync_obj.img_count)
     {
         switch (io)
         {
@@ -98,9 +97,9 @@ static int readFrame(void)
                     errno_exit("read");
                 }
             }
-                count ++;
+            sync_obj.img_count ++;
 
-            process_image(&buffers[0], count);
+            process_image(&buffers[0], sync_obj.img_count);
             break;
 
 // IO_METHOD_MMAP
@@ -131,16 +130,17 @@ static int readFrame(void)
 
             printf("normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
             assert(buf.index < n_buffers);
-            process_image(&buffers[buf.index], count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
+            process_image(&buffers[buf.index], sync_obj.img_count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
             // printf("start transfer ... \n");
-            count ++;
+            sync_obj.img_count ++;
             
-            sync_obj.index_video = count;
+            sync_obj.index_video = sync_obj.img_count;
             clock_gettime(CLOCK_REALTIME, &sync_obj.ts_video);
+            if (sync_obj.img_count == frame_count) sync_obj.SPI_enable = 0;
 
             gettimeofday(&end, 0);
             float sec_loop = ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6);
-            printf("num %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", count,sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********" : "");
+            printf("\nnum %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", sync_obj.img_count, sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********" : "");
             gettimeofday(&begin, 0);
             
             if(buf.bytesused == 0) continue;
@@ -183,7 +183,7 @@ static int readFrame(void)
                 (void *)buf.m.userptr,
                  buf.bytesused
             };
-            process_image(&image_buf, count);
+            process_image(&image_buf, sync_obj.img_count);
 
             if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
                 errno_exit("VIDIOC_QBUF");
@@ -216,13 +216,15 @@ int main(int argc, char **argv)
     if(show_image_enable) SDL_init();
     if(save_image_enable) StartJpgFile();
     if(spi_check_enable)  SPI_Init();
-    if(spi_check_enable) pthread_create(&pt_thre, NULL, Mlt_SPI_transfer, NULL); // spi thread here
+    if(spi_check_enable)  pthread_create(&pt_thre, NULL, Mlt_SPI_transfer, NULL); // spi thread here
 
     readFrame();
     stopCapturing();
+
     if(show_image_enable)  SDL_deinit();
     if(save_image_enable)  FinishJpgFile();
-    if(spi_check_enable)  SPI_Close();
+    if(spi_check_enable)   pthread_exit(NULL);
+    if(spi_check_enable)   SPI_Close();
 
     uninitDevice();
     closeDevice();

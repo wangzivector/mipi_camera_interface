@@ -46,9 +46,15 @@ struct sync_index
 {
     long index_video;
     struct timespec ts_video;
+
     long index_trigger;
     struct timespec ts_trigger;
+
+    unsigned int imgts_count;
+    unsigned int img_count;
+    unsigned char SPI_enable;
 } sync_index;
+
 
 extern struct sync_index sync_obj;
 

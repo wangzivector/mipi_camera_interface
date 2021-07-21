@@ -57,7 +57,6 @@ extern char *dev_name;
 extern int force_format;
 extern enum io_method io;
 
-
 void option_usage(FILE *fp, int argc, char **argv);
 int set_option(int argc, char **argv);
 
