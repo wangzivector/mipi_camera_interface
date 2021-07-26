@@ -65,7 +65,11 @@ int GPIO_read(unsigned char Pin_num)
 int Start_file_txt(void)
 {
 	int state = 0;
-	fpWrite_txt = fopen("VINS_log_data.txt", "w");
+	char *_save_folder = "./images/";
+	char name_txt[30];
+	sprintf(name_txt, "%s%s", _save_folder, "ImgIMU_timestamp.txt");
+
+	fpWrite_txt = fopen(name_txt, "w");
 	printf("== START DATA == write state code: %d \n", fpWrite_txt);
 	if(fpWrite_txt == NULL) return -1;
 	
@@ -90,8 +94,8 @@ int write_image_header(unsigned short seq_num, unsigned int timestamp)
 {
 	if(fpWrite_txt == NULL) return -1;
 	char *_save_folder = "./images/";
-	fprintf(fpWrite_txt, "%010d   IMG  %sov9281_%d*%d_%04d.jpeg   seqnum %05d\n",
-	   timestamp, _save_folder, 1280, 800, seq_num-1, seq_num);
+	fprintf(fpWrite_txt, "%010d   IMG   %sshot%05d.jpg   seqnum %05d\n",
+	   timestamp, _save_folder, seq_num-1, seq_num);
 	return 0;
 }
 
@@ -99,7 +103,7 @@ int write_imu_meas(unsigned short seq_num, unsigned int timestamp, short *data_a
 {
 	if(fpWrite_txt == NULL) return -1;
 	
-	fprintf(fpWrite_txt, "%010d   IMU  %06d %06d %06d   %06d %06d %06d  seqnum %05d\n", timestamp, 
+	fprintf(fpWrite_txt, "%010d   IMU   %06d %06d %06d %06d %06d %06d  seqnum %05d\n", timestamp, 
 	    data_arr[0], data_arr[1], data_arr[2], data_arr[3], data_arr[4], data_arr[5], seq_num);
 	return 0;
 }
@@ -126,8 +130,11 @@ int decode_msg(char *buff_rx)
 	if((buff_rx[72+6] == 0xfe)&&(buff_rx[73+6] == 0xdc)&&(buff_rx[74+6] == 0xba)&&
 		(buff_rx[75+6] == 0x98)&&(buff_rx[76+6] == 0x76)&&(buff_rx[77+6] == 0x54)) // for debug you might take it as CRC
 	{
-		if (sync_obj.state != WORKING) sync_obj.state = FINISHED;
-
+		if (sync_obj.state != WORKING) 
+		{
+			sync_obj.state = FINISHED;
+			printf("\n[debug] saving spi imgts but not in working mode! it maybe first spi msg missing. enter FINISHED\n");
+		}
 		// image header 
 		link_data = &img_seq_num; type_size = 2;       memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
 		link_data = &img_timestamp; type_size = 4;     memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
@@ -159,8 +166,11 @@ int decode_msg(char *buff_rx)
 		
 		return idex_imu;
 	}
-	else if(sync_obj.state == WORKING)   sync_obj.state = FINISHED;
-	
+	else if(sync_obj.state == WORKING)   
+	{
+		sync_obj.state = FINISHED;
+			printf("\n[debug] Msg header decode wrong. maybe the header transformed wrong, enter FINISHED\n");
+	}
 	return -1;
 }
 
@@ -216,6 +226,8 @@ void *Mlt_SPI_transfer(void *frame_count_in)
 			if((for_now.tv_sec - sync_obj.ts_trigger.tv_sec) > 1 && (sync_obj.state == WORKING)) 
 			{
 				sync_obj.state = FINISHED;
+				printf("\n[debug] spi wait toolong time.enter FINISHED\n");
+
 			}
 			usleep(100);
 			//printf("for_now.tv_sec - sync_obj.ts_trigger.tv_sec: %d with flag %d \n", for_now.tv_sec - sync_obj.ts_trigger.tv_sec, sync_obj.state);

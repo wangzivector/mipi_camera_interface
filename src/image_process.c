@@ -178,7 +178,7 @@ int FinishSaveFile(void)
 
             case FINAL_SEP_SAVE:
                 sprintf(picname, "%sov9281_%d*%d_%04d%s",save_folder, frame_width, frame_height, free_index, SAVE_AS_JPG ? ".jpeg":".bmp");
-                printf(" image saved: %s\n", picname);
+                printf(" image saved: %s", picname);
                 if(SAVE_AS_JPG)
                 GenJpegFile(tempsave[free_index].start, 1, frame_width, frame_height, picname);
                 else
@@ -200,7 +200,7 @@ int FinishSaveFile(void)
         }
 
         gettimeofday(&end, 0);
-        printf("---- time : %.02f ms\n", ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6)*1000.0);
+        printf("---- time : %.02f ms\r", ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6)*1000.0);
         gettimeofday(&begin, 0);
 
         free(tempsave[free_index].start);
