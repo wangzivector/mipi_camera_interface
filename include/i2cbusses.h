@@ -18,6 +18,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/spi/spidev.h>
+#include <time.h>
 
 #include <pthread.h>
 
@@ -29,6 +30,12 @@ enum parse_state {
 enum i2c_dir {
 	I2C_WRITE_MODE,
 	I2C_READ_MODE,
+};
+
+enum State_Com {
+	STAND_BY,
+	WORKING,
+	FINISHED
 };
 
 struct reg {
@@ -53,6 +60,8 @@ struct sync_index
     unsigned int imgts_count;
     unsigned int img_count;
     unsigned char SPI_enable;
+    
+    enum State_Com state;
 } sync_index;
 
 

@@ -71,27 +71,27 @@ int Start_file_txt(void)
 	
 	fprintf(fpWrite_txt, "== START DATA ==\n");
 	sync_obj.imgts_count = 0;
+	sync_obj.state = WORKING;
 	// fclose(fpWrite_txt);
 	return 0;
 }
 
 int Close_file_txt(void)
 {
-	usleep(1000*10);
 	if(fpWrite_txt == NULL) return -1;
-	fprintf(fpWrite_txt, "== END DATA ==\n");
+	fprintf(fpWrite_txt, "== END DATA == ID: %d\n", sync_obj.ts_video.tv_nsec);
 	fclose(fpWrite_txt);
 
-	printf("Closing file txt ... with image %d and imgts %d\n", sync_obj.img_count, sync_obj.imgts_count);
+	printf("Closing LOG txt ... with image %d and imageTS %d  with id: %d\n", sync_obj.img_count, sync_obj.imgts_count, sync_obj.ts_video.tv_nsec);
 	return 0;
 }
 
 int write_image_header(unsigned short seq_num, unsigned int timestamp)
 {
 	if(fpWrite_txt == NULL) return -1;
-	
-	fprintf(fpWrite_txt, "%010d   IMG  nameofimagedata                              seqnum %05d\n",
-	   timestamp, seq_num);
+	char *_save_folder = "./images/";
+	fprintf(fpWrite_txt, "%010d   IMG  %sov9281_%d*%d_%04d.jpeg   seqnum %05d\n",
+	   timestamp, _save_folder, 1280, 800, seq_num-1, seq_num);
 	return 0;
 }
 
@@ -122,15 +122,17 @@ int decode_msg(char *buff_rx)
 		Start_file_txt();
 		return 0;
 	}
-
+	
 	if((buff_rx[72+6] == 0xfe)&&(buff_rx[73+6] == 0xdc)&&(buff_rx[74+6] == 0xba)&&
 		(buff_rx[75+6] == 0x98)&&(buff_rx[76+6] == 0x76)&&(buff_rx[77+6] == 0x54)) // for debug you might take it as CRC
 	{
+		if (sync_obj.state != WORKING) sync_obj.state = FINISHED;
+
 		// image header 
 		link_data = &img_seq_num; type_size = 2;       memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
 		link_data = &img_timestamp; type_size = 4;     memcpy(link_data, (buff_rx + incre_num), type_size); incre_num += type_size;
 		single_save_flag = 0;
-		printf("++image timestamp :%d  seq:%d \n", img_timestamp, img_seq_num);	
+		printf("++image timestamp :%d  seq:%d \n", (unsigned int)img_timestamp, img_seq_num);	
 		
 		for(idex_imu = 0; idex_imu < 4; idex_imu ++)
 		{
@@ -157,19 +159,24 @@ int decode_msg(char *buff_rx)
 		
 		return idex_imu;
 	}
+	else if(sync_obj.state == WORKING)   sync_obj.state = FINISHED;
+	
 	return -1;
 }
 
 
-void *Mlt_SPI_transfer(void *none)
+void *Mlt_SPI_transfer(void *frame_count_in)
 {
+	int frame_count = *((int *) frame_count_in);
 	int ret, i, offset_index = 0;
 	unsigned short index_short = 0;
 	struct msg_header header_msg;
 
-	uint8_t tx[84] = {0x11};
+	unsigned short frame_count_to_send = frame_count;
+	uint8_t tx[84] = {0xAA, (frame_count_to_send & 0xFF00) >> 8, (frame_count_to_send & 0x00FF), 0xAA};
 	uint8_t rx[ARRAY_SIZE(tx)] = {0, };
-
+	struct timespec for_now;
+	
 	struct spi_ioc_transfer tr = {
 		.tx_buf = (unsigned long)tx,
 		.rx_buf = (unsigned long)rx,
@@ -179,18 +186,21 @@ void *Mlt_SPI_transfer(void *none)
 		.bits_per_word = bits,
 	};
 
-	uint8_t tx_tm[] = {0xBB, 0xBB, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
-	uint8_t rx_tm[ARRAY_SIZE(tx)] = {0, };
-	struct spi_ioc_transfer tr_tm = {
-		.tx_buf = (unsigned long)tx_tm,
-		.rx_buf = (unsigned long)rx_tm,
-		.len = ARRAY_SIZE(tx_tm),
-		.delay_usecs = 0,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
+	//uint8_t tx_tm[] = {0xBB, 0xBB, (index_short & 0xFF00) >> 8, (index_short & 0x00FF)};
+	//uint8_t rx_tm[ARRAY_SIZE(tx)] = {0, };
+	//struct spi_ioc_transfer tr_tm = {
+		//.tx_buf = (unsigned long)tx_tm,
+		//.rx_buf = (unsigned long)rx_tm,
+		//.len = ARRAY_SIZE(tx_tm),
+		//.delay_usecs = 0,
+		//.speed_hz = speed,
+		//.bits_per_word = bits,
+	//};
+	
 	sync_obj.SPI_enable = 1;
-
+	sync_obj.state = STAND_BY;
+	clock_gettime(CLOCK_REALTIME, &sync_obj.ts_trigger);
+	
 	while(sync_obj.SPI_enable){
 
 		// index_short = 0xCCDD;
@@ -202,20 +212,30 @@ void *Mlt_SPI_transfer(void *none)
 			ret = ioctl(fd_spi, SPI_IOC_MESSAGE(1), &tr);
 		else
 		{
+			clock_gettime(CLOCK_REALTIME, &for_now);
+			if((for_now.tv_sec - sync_obj.ts_trigger.tv_sec) > 1 && (sync_obj.state == WORKING)) 
+			{
+				sync_obj.state = FINISHED;
+			}
 			usleep(100);
+			//printf("for_now.tv_sec - sync_obj.ts_trigger.tv_sec: %d with flag %d \n", for_now.tv_sec - sync_obj.ts_trigger.tv_sec, sync_obj.state);
 			continue;
 		}
 		
+		
 		if (ret < 1)
 			pabort("can't send spi message");
+		
 		
 		if (decode_msg(rx) > 0)
 		{
 			sync_obj.imgts_count ++;
 			// continue;
 		}
-
-		printf("SPI %d transfer buffer finished: \n", sync_obj.imgts_count);
+		
+		clock_gettime(CLOCK_REALTIME, &sync_obj.ts_trigger);
+		
+		printf("SPI %d transfer buffer finished with state %d: \n", sync_obj.imgts_count, sync_obj.state);
 		for (ret = 0; ret < ARRAY_SIZE(tx); ret++)
 		{
 			printf("%.2X ", rx[ret]);
@@ -262,6 +282,7 @@ void *Mlt_SPI_transfer(void *none)
 		// clock_gettime(CLOCK_REALTIME, &sync_obj.ts_trigger);
 		// printf("\n transfer session done!\n");
 	} 
+	pthread_exit(NULL);
 	return 0;
 }
 

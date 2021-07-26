@@ -1,5 +1,10 @@
 #include "image_process.h"
+
 #define mask32(BYTE) (*(uint32_t *)(uint8_t [4]){ [BYTE] = 0xff })
+
+#define USE_DIFF_JPEG_ENCODE_TABLE TRUE
+#define SAVE_AS_JPG TRUE
+#define MAX_IMAGE_TEMP_BUFFER 1000
 
 unsigned char * display_buffer;
 
@@ -7,18 +12,89 @@ typedef enum {
     MIDDLE_COM_SAVE,
     FINAL_SEP_SAVE,
     FINAL_COM_SAVE,
+    JPEG_SEP_SAVE,
 
 } IMAGE_SAVE_MODE;
 
-IMAGE_SAVE_MODE save_mode  = MIDDLE_COM_SAVE;
+IMAGE_SAVE_MODE save_mode  = FINAL_SEP_SAVE;
 
 
-struct buffer tempsave[300];
+struct buffer tempsave[MAX_IMAGE_TEMP_BUFFER];
 int tempsave_index = 0;
 FILE *fp_jpg;
-// int fp_jpg;
 
-int StartJpgFile(void)
+struct jpeg_compress_struct cinfo;
+struct jpeg_error_mgr jerr;
+JSAMPROW row_pointer[1];
+
+
+
+//------------save image picture captured in jpeg mode--------///
+int initial_Jpeg(void)
+{
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+
+    cinfo.image_width = frame_width;
+    cinfo.image_height = frame_height;
+    cinfo.input_components = 1; // or 3 for RGB
+    cinfo.in_color_space = JCS_GRAYSCALE; // or JCS_RGB
+    
+    jpeg_set_defaults(&cinfo);
+    cinfo.num_components = 1;
+    cinfo.dct_method = JDCT_FLOAT;
+    jpeg_set_quality(&cinfo, 90, TRUE);
+    
+    if(USE_DIFF_JPEG_ENCODE_TABLE) return 0;
+
+    fp_jpg = fopen("./images/image_ov9281.table", "wb");
+    if(!fp_jpg)
+    {
+        printf("fopen failed : %s, %d\n", __FILE__, __LINE__);
+        return 0;
+    }
+    jpeg_stdio_dest(&cinfo, fp_jpg);
+    jpeg_write_tables(&cinfo);
+    fclose(fp_jpg);
+    return 0;
+}
+
+int finished_Jpeg(void)
+{
+    jpeg_destroy_compress(&cinfo);
+}
+
+
+int GenJpegFile(unsigned char *raw_image, unsigned char bitCountPerPix, unsigned int width, unsigned int height, const char *filename)
+{
+    // file to save image
+    fp_jpg = fopen(filename, "wb");
+    if(!fp_jpg)
+    {
+        printf("fopen failed : %s, %d\n", __FILE__, __LINE__);
+        return 0;
+    }
+
+    jpeg_stdio_dest(&cinfo, fp_jpg);
+
+    jpeg_start_compress(&cinfo, USE_DIFF_JPEG_ENCODE_TABLE);
+
+    while(cinfo.next_scanline < cinfo.image_height)
+    {
+        // row_pointer[0] = &raw_image_temp[cinfo.next_scanline * cinfo.image_width * cinfo.input_components];
+        row_pointer[0] = (raw_image + cinfo.next_scanline * cinfo.image_width * cinfo.input_components);
+        jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+    // return 0;
+
+    jpeg_finish_compress(&cinfo);
+    fclose(fp_jpg);
+ 
+    return 1;
+}
+
+
+int StartSaveFile(void)
 {
     tempsave_index = 0;
 
@@ -35,16 +111,21 @@ int StartJpgFile(void)
             }
         break;
 
+        case JPEG_SEP_SAVE:
+            initial_Jpeg();
+            break;
+
         case FINAL_SEP_SAVE:
+            if (SAVE_AS_JPG) initial_Jpeg();
         break;
 
         default: printf("wrong mode!");
     }
 }
 
-int LoadJpgFile(const struct buffer *buf_img){
-    struct timeval begin, end;
-    gettimeofday(&begin, 0);
+int LoadSaveFile(const struct buffer *buf_img){
+    struct timespec begin, end;
+    char picname[30];
 
     switch (save_mode){
         case MIDDLE_COM_SAVE:
@@ -64,13 +145,25 @@ int LoadJpgFile(const struct buffer *buf_img){
             tempsave_index ++;
         break;
 
+        case JPEG_SEP_SAVE:
+            
+            sprintf(picname, "%sov9281_%d*%d_%04d.jpeg",save_folder, frame_width, frame_height, tempsave_index);
+            printf("\nstart jpeg encode and saved: %s\n", picname);
+
+        clock_gettime(CLOCK_REALTIME, &begin);
+            GenJpegFile(buf_img->start, 1, frame_width, frame_height, picname);
+        clock_gettime(CLOCK_REALTIME, &end);
+    
+        printf("\nLoadJpgFile----  time : %.02f ms\n", (end.tv_sec - begin.tv_sec)*1000.0 + (end.tv_nsec - begin.tv_nsec)*1e-6);
+            tempsave_index ++;
+
+        break;
+
         default: printf("wrong mode!");
     }
-        gettimeofday(&end, 0);
-        printf("\nLoadJpgFile---- time : %.02f ms\n", ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6)*1000.0);
 }
 
-int FinishJpgFile(void)
+int FinishSaveFile(void)
 {
     int free_index;
     char picname[100];
@@ -84,8 +177,11 @@ int FinishJpgFile(void)
             break;
 
             case FINAL_SEP_SAVE:
-                sprintf(picname, "%sov9281_%d*%d_%03d.bmp",save_folder, frame_width, frame_height, free_index);
+                sprintf(picname, "%sov9281_%d*%d_%04d%s",save_folder, frame_width, frame_height, free_index, SAVE_AS_JPG ? ".jpeg":".bmp");
                 printf(" image saved: %s\n", picname);
+                if(SAVE_AS_JPG)
+                GenJpegFile(tempsave[free_index].start, 1, frame_width, frame_height, picname);
+                else
                 GenBmpFile(tempsave[free_index].start, 8, frame_width,frame_height, picname); 
             break;
 
@@ -94,7 +190,10 @@ int FinishJpgFile(void)
                     fwrite(tempsave[free_index].start, tempsave[free_index].length, 1, fp_jpg));
                     // write(fp_jpg, tempsave[free_index].start, tempsave[free_index].length));
                 // sync();
+            break;
 
+            case JPEG_SEP_SAVE:
+                continue;
             break;
 
             default: printf("wrong mode!");
@@ -117,6 +216,10 @@ int FinishJpgFile(void)
         break;
 
         case FINAL_SEP_SAVE:
+        break;
+
+        case JPEG_SEP_SAVE:
+            finished_Jpeg();
         break;
 
         default: printf("wrong mode!");
@@ -333,3 +436,4 @@ int GenBmpFile(const unsigned char *pData, unsigned char bitCountPerPix, unsigne
  
     return 1;
 }
+

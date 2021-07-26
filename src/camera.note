@@ -1,3 +1,16 @@
+## HOW TO START
+1. DOWNLOAD THE CODE AND CONNECT PINS
+
+2. REPLACE CAMERA DRIVER VIA LINK:
+https://www.arducam.com/docs/cameras-for-raspberry-pi/migrated/ov9281-1mp-global-shutter-raspberrypi-camera/
+
+3.1 INSTALL LIB SDL1(Change the set commnad of  SDL_lib dir in Cmakelists.txt)
+
+3.2 INSTALL: sudo apt-get install libjpeg-dev
+
+4. make and run: make && sudo ./src/camera_image_grab -f -p -e -s -c 20
+
+
 ### stream out demo
 v4l2-ctl --stream-mmap --stream-count=-1 -d /dev/video0 --stream-to=/dev/null
 

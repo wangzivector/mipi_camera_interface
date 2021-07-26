@@ -30,7 +30,7 @@ static void process_image(const struct buffer *buf_img, int index_image)
                 // char picname[100];
                 // sprintf(picname,"%sov5MP_%d*%d_%d.bmp",save_folder ,frame_width,frame_height, index_image);
                 // GenBmpFile(buf_img.start, 24, frame_width,frame_height,picname); 
-                LoadJpgFile(buf_img);
+                LoadSaveFile(buf_img);
                 // printf("\rimage saved: %s", picname);
             }
             if(show_image_enable)
@@ -47,7 +47,7 @@ static void process_image(const struct buffer *buf_img, int index_image)
                 // char picname[100];
                 // sprintf(picname,"%sov9281_%d*%d_%03d.bmp",save_folder ,frame_width,frame_height, index_image);
                 // GenBmpFile(buf_img.start, 8, frame_width, frame_height, picname); 
-                LoadJpgFile(buf_img);
+                LoadSaveFile(buf_img);
                 // printf("\nimage saved: %s", picname);
             }
             if(show_image_enable)
@@ -75,8 +75,9 @@ static int readFrame(void)
     uncatched = 0;
     uncatched_last = 0;
     sync_obj.img_count = 0;
-    for (sync_obj.img_count = 0; sync_obj.img_count < frame_count; sync_obj.img_count)
+    for (sync_obj.img_count = 0; (sync_obj.img_count <= frame_count) && (sync_obj.state != FINISHED); sync_obj.img_count)
     {
+        printf("here we ------+++++++++got  sync_obj.img_count : %d \n\n", sync_obj.img_count);
         switch (io)
         {
 //////////////////////////////////////////////////////////////////////////////////////
@@ -115,7 +116,7 @@ static int readFrame(void)
                 switch (errno)
                 {
                 case EAGAIN:
-                    while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) // dqbuf means take out from memory space and to process 
+                    while (-1 == xioctl(fd, VIDIOC_DQBUF, &buf) && sync_obj.state != FINISHED) // dqbuf means take out from memory space and to process
                         uncatched++;
                    break;
 
@@ -127,26 +128,29 @@ static int readFrame(void)
                     errno_exit("VIDIOC_DQBUF");
                 }
             }
-
-            printf("normal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
+            
+            if(sync_obj.state == FINISHED) continue;
+            printf("\nnormal capture period with loop %d / %d -- %d \n", uncatched, uncatched_last, uncatched - uncatched_last);
             assert(buf.index < n_buffers);
             process_image(&buffers[buf.index], sync_obj.img_count); // process each iamge right after getting it, then next., address of dqbuf_buff_address is related to buffers[].start
+            sync_obj.img_count++;
             // printf("start transfer ... \n");
-            sync_obj.img_count ++;
             
-            sync_obj.index_video = sync_obj.img_count;
-            clock_gettime(CLOCK_REALTIME, &sync_obj.ts_video);
-            if (sync_obj.img_count == frame_count) sync_obj.SPI_enable = 0;
 
             gettimeofday(&end, 0);
             float sec_loop = ((end.tv_sec - begin.tv_sec) + (end.tv_usec - begin.tv_usec)*1e-6);
             printf("\nnum %d --- time : %.02f ms ---------------------- -- frame rate: -// %.02f // %s\n", sync_obj.img_count, sec_loop*1000.0, 1/sec_loop, 1/sec_loop < 8 ? "***********" : "");
             gettimeofday(&begin, 0);
-            
+            sync_obj.index_video = sync_obj.img_count;
+            clock_gettime(CLOCK_REALTIME, &sync_obj.ts_video);
+        
             if(buf.bytesused == 0) continue;
             if (-1 == xioctl(fd, VIDIOC_QBUF, &buf)) // after processing the image data, put the buffer container back query to stream video
+            {
                 errno_exit("VIDIOC_QBUF");
+            }
             break;
+
 
 //////////////////////////////////////////////////////////////////////////////////////
 
@@ -190,6 +194,14 @@ static int readFrame(void)
             break;
         }
     }
+
+    if (sync_obj.img_count > sync_obj.imgts_count)
+    {
+        printf("try waiting for timestamp as it may come...\n");
+        usleep(1000*1000);
+    }
+    sync_obj.SPI_enable = 0;
+    
     return 1;
 }
 
@@ -214,16 +226,16 @@ int main(int argc, char **argv)
     
     // if(show_image_enable)  SDL_display_init();
     if(show_image_enable) SDL_init();
-    if(save_image_enable) StartJpgFile();
+    if(save_image_enable) StartSaveFile();
     if(spi_check_enable)  SPI_Init();
-    if(spi_check_enable)  pthread_create(&pt_thre, NULL, Mlt_SPI_transfer, NULL); // spi thread here
+    if(spi_check_enable)  pthread_create(&pt_thre, NULL, Mlt_SPI_transfer, (void *)&frame_count); // spi thread here
 
     readFrame();
     stopCapturing();
 
     if(show_image_enable)  SDL_deinit();
-    if(save_image_enable)  FinishJpgFile();
-    if(spi_check_enable)   pthread_exit(NULL);
+    if(save_image_enable)  FinishSaveFile();
+    if(spi_check_enable)   pthread_join(pt_thre, NULL);
     if(spi_check_enable)   SPI_Close();
 
     uninitDevice();

@@ -10,6 +10,8 @@ project(v4l2Test)
 
 find_package(SDL REQUIRED)
 
+set(SDL_LIBS "/usr/local/lib/libSDL.so")
+
 include_directories(include)
 add_subdirectory(src)
 # If the package has been found, several variables will
@@ -34,7 +36,7 @@ add_subdirectory(src)
 # add_executable(camera_image_grab camera_image_grab.c image_process.c device_operation.c camera_control.c parameter.c)
  
 # # Link your application with OpenCV libraries
-# target_link_libraries(camera_image_grab /usr/lib/arm-linux-gnueabihf/libSDL.so)
+# target_link_libraries(camera_image_grab ${SDL_LIBS})
 
 
  
@@ -42,5 +44,5 @@ add_subdirectory(src)
 # add_executable(copy copy.cpp)
  
 # Link your application with OpenCV libraries
-# target_link_libraries(copy /usr/lib/arm-linux-gnueabihf/libSDL.so)
+# target_link_libraries(copy ${SDL_LIBS})
 

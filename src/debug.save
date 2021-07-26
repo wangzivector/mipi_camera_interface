@@ -1,0 +1,172 @@
+   /////////////////
+    READ FRAME
+here we ------+++++++++got  sync_obj.img_count : 0 
+
+SPI 0 transfer buffer finished with state 0: 
+02 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+== START DATA == write state code: -1269824072 
+SPI 0 transfer buffer finished with state 1: 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+01 02 03 04 05 06 
+
+normal capture period with loop 818719 / 0 -- 818719 
+image size is : 1024000  image seems GREY format
+num 1 --- time : 788.10 ms ---------------------- -- frame rate: -// 1.27 // ***********
+here we ------+++++++++got  sync_obj.img_count : 1 
+
+++image timestamp :1444932044  seq:1 
+--IMU timestamp :1444901813  seq:1 --IMU data: 331 149 922 -9 -12 13 
+--IMU timestamp :1444911824  seq:2 --IMU data: 314 148 897 25 9 -5 
+--IMU timestamp :1444921813  seq:3 --IMU data: 319 155 912 27 9 -9 
+--IMU timestamp :1444931843  seq:4 --IMU data: 324 161 914 23 23 1 
+SPI 1 transfer buffer finished with state 1: 
+01 00 CC E9 1F 56 
+01 00 B5 73 1F 56 
+4B 01 95 00 9A 03 
+F7 FF F4 FF 0D 00 
+02 00 D0 9A 1F 56 
+3A 01 94 00 81 03 
+19 00 09 00 FB FF 
+03 00 D5 C1 1F 56 
+3F 01 9B 00 90 03 
+1B 00 09 00 F7 FF 
+04 00 03 E9 1F 56 
+44 01 A1 00 92 03 
+17 00 17 00 01 00 
+FE DC BA 98 76 54 
+
+
+   /////////////////
+    READ FRAME
+here we ------+++++++++got  sync_obj.img_count : 0 
+
+== START DATA == write state code: -1268775496 
+SPI 0 transfer buffer finished with state 1: 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+01 02 03 04 05 06 
+
+normal capture period with loop 846934 / 0 -- 846934 
+image size is : 1024000  image seems GREY format
+num 1 --- time : 795.13 ms ---------------------- -- frame rate: -// 1.26 // ***********
+here we ------+++++++++got  sync_obj.img_count : 1 
+
+
+normal capture period with loop 875775 / 846934 -- 28841 
+image size is : 1024000  image seems GREY format++image timestamp :1762141901  seq:1 
+--IMU timestamp :1762111813  seq:1 --IMU data: 384 -171 807 -333 237 374 
+--IMU timestamp :1762121824  seq:2 --IMU data: 411 -149 854 -579 180 312 
+--IMU timestamp :1762131331  seq:3 --IMU data: 451 -229 886 -579 180 312 
+--IMU timestamp :1762141331  seq:4 --IMU data: 408 -270 995 -749 -88 67 
+SPI 1 transfer buffer finished with state 1: 
+01 00 CD 26 08 69 
+01 00 45 B1 07 69 
+80 01 55 FF 27 03 
+B3 FE ED 00 76 01 
+02 00 60 D8 07 69 
+9B 01 6B FF 56 03 
+BD FD B4 00 38 01 
+03 00 83 FD 07 69 
+C3 01 1B FF 76 03 
+BD FD B4 00 38 01 
+04 00 93 24 08 69 
+98 01 F2 FE E3 03 
+13 FD A8 FF 43 00 
+FE DC BA 98 76 54 
+
+num 2 --- time : 31.98 ms ---------------------- -- frame rate: -// 31.27 // 
+here we ------+++++++++got  sync_obj.img_count : 2 
+
+
+
+
+
+
+============================================
+
+   /////////////////
+    READ FRAME
+here we ------+++++++++got  sync_obj.img_count : 0 
+
+== START DATA == write state code: -1269824072 
+SPI 0 transfer buffer finished with state 1: 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+01 02 03 04 05 06 
+++image timestamp :1461797015  seq:1 
+--IMU timestamp :1461791331  seq:1 --IMU data: 325 140 928 -30 -6 -8 
+--IMU timestamp :1461801330  seq:2 --IMU data: 316 141 920 -27 -6 2 
+SPI 1 transfer buffer finished with state 1: 
+01 00 97 40 21 57 
+01 00 63 2A 21 57 
+45 01 8C 00 A0 03 
+E2 FF FA FF F8 FF 
+02 00 72 51 21 57 
+3C 01 8D 00 98 03 
+E5 FF FA FF 02 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+00 00 00 00 00 00 
+FE DC BA 98 76 54 
+
+normal capture period with loop 1205948 / 0 -- 1205948 
+image size is : 1024000  image seems GREY format
+num 1 --- time : 1080.80 ms ---------------------- -- frame rate: -// 0.93 // ***********
+here we ------+++++++++got  sync_obj.img_count : 1 
+
+++image timestamp :1461830349  seq:2 
+--IMU timestamp :1461811330  seq:3 --IMU data: 322 162 909 18 -7 8 
+--IMU timestamp :1461821331  seq:4 --IMU data: 325 155 915 11 -10 -3 
+--IMU timestamp :1461831331  seq:5 --IMU data: 314 151 904 4 19 1 
+SPI 2 transfer buffer finished with state 1: 
+02 00 CD C2 21 57 

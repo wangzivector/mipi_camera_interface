@@ -16,7 +16,7 @@ int ext_trg_enable = 0;
 int vid_stream_enable = 0;
 int spi_check_enable = 0;
 
-char *save_folder = "./image/";
+char *save_folder = "./images/";
 char *dev_name = "/dev/video0";
 
 enum io_method io = IO_METHOD_MMAP;

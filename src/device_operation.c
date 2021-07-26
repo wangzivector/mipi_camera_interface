@@ -469,6 +469,24 @@ void setRegExtMode(void)
 		{0x3006, 0x0c}, // [1]:direction of fsin, [3]:strobe pin direction -- 0x04 
 		// {0x3023, 0x02}, // [1]:powermode of MIPI 
 	};
+
+	struct reg regs_GainExpose[] = {
+		{0x3503, 0x03}, // manual control of exposure and gain -- 0x08
+		{0x3509, 0xd0}, // manual control of exposure and gain -- 0x08
+        {0x350A, 0xaa}, // digital gain num [7:0]-->[13:6]     -- 0x04
+        {0x350B, 0xaa}, // digital gain num [5:0]-->[5:0]      -- 0x00
+        {0x350E, 0xaa}, // digital gain num [7:0]-->[13:6]     -- 0x04
+        {0x350F, 0xaa}, // digital gain num [5:0]-->[5:0]      -- 0x00
+        {0x3500, 0x00}, // long exposure [3:0]-->[19:16]       -- 0x00
+        {0x3501, 0x0A}, // long exposure [7:0]-->[15:8]        -- 0x2c
+        {0x3502, 0x00}, // long exposure [7:4]-->[3:0]  [7:4]-->fraction bits[3:0] -- 0x10   
+	};
+
+    struct reg more_regs[] = {
+		{0x300d, 0x60},
+		// {0x3027, 0x00},
+	};
+
 	struct reg regs_stream[] = {
 		{0x4F00, 0x00},
 		{0x3030, 0x00},
@@ -482,22 +500,7 @@ void setRegExtMode(void)
 		{0x3006, 0x04}, // direction of fsin -- 0x04
 
 	};
-	struct reg regs_GainExpose[] = {
-		{0x3503, 0x03}, // manual control of exposure and gain -- 0x08
-		{0x3509, 0x60}, // manual control of exposure and gain -- 0x08
-        {0x350A, 0x04}, // digital gain num [7:0]-->[13:6]     -- 0x04
-        {0x350B, 0x00}, // digital gain num [5:0]-->[5:0]      -- 0x00
-        {0x3500, 0x00}, // long exposure [3:0]-->[19:16]       -- 0x00
-        {0x3501, 0x2c}, // long exposure [7:0]-->[15:8]        -- 0x2c
-        {0x3502, 0x10}, // long exposure [7:4]-->[3:0]  [7:4]-->fraction bits[3:0] -- 0x10   
-	};
 
-    struct reg more_regs[] = {
-		{0x300d, 0x60},
-		// {0x3027, 0x00},
-	};
-
-    
 
     if (ext_trg_enable)
     {

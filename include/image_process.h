@@ -3,7 +3,9 @@
 #define IMAGE_PROCESSS_H_
 
 #include <SDL/SDL.h>
+#include <jpeglib.h>
 #include "parameter.h"
+#include <time.h>
 #include "bmp.h"
 
 /* This macro simplifies accessing a given pixel component on a surface. */
@@ -15,10 +17,12 @@ SDL_Surface *data_sf;
 
 
 int GenBmpFile(const unsigned char *pData, unsigned char bitCountPerPix, unsigned int width, unsigned int height, const char *filename);
+int GenJpegFile(unsigned char *raw_image, unsigned char bitCountPerPix, unsigned int width, unsigned int height, const char *filename);
 
-int StartJpgFile(void);
-int LoadJpgFile(const struct buffer *buf_img);
-int FinishJpgFile(void);
+
+int StartSaveFile(void);
+int LoadSaveFile(const struct buffer *buf_img);
+int FinishSaveFile(void);
 
 int SDL_display_init();
 int SDL_display(const unsigned char *pData, int bitperpix);
