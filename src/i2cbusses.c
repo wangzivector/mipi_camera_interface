@@ -73,7 +73,7 @@ int Start_file_txt(void)
 	printf("== START DATA == write state code: %d \n", fpWrite_txt);
 	if(fpWrite_txt == NULL) return -1;
 	
-	fprintf(fpWrite_txt, "== START DATA ==\n");
+	//fprintf(fpWrite_txt, "== START DATA ==\n");
 	sync_obj.imgts_count = 0;
 	sync_obj.state = WORKING;
 	// fclose(fpWrite_txt);
@@ -83,10 +83,11 @@ int Start_file_txt(void)
 int Close_file_txt(void)
 {
 	if(fpWrite_txt == NULL) return -1;
-	fprintf(fpWrite_txt, "== END DATA == ID: %d\n", sync_obj.ts_video.tv_nsec);
+	//fprintf(fpWrite_txt, "== END DATA == ID: %d\n", sync_obj.ts_video.tv_nsec);
 	fclose(fpWrite_txt);
 
-	printf("Closing LOG txt ... with image %d and imageTS %d  with id: %d\n", sync_obj.img_count, sync_obj.imgts_count, sync_obj.ts_video.tv_nsec);
+	printf("Closing LOG txt ... with image %d and imageTS %d with wrong:%d\n", sync_obj.img_count, sync_obj.imgts_count, sync_obj.ts_video.tv_nsec, sync_obj.imgts_count_wrong);
+	// printf("Closing LOG txt ... with image %d and imageTS %d  with id: %d\n", sync_obj.img_count, sync_obj.imgts_count, sync_obj.ts_video.tv_nsec);
 	return 0;
 }
 
@@ -94,8 +95,8 @@ int write_image_header(unsigned short seq_num, unsigned int timestamp)
 {
 	if(fpWrite_txt == NULL) return -1;
 	char *_save_folder = "./images/";
-	fprintf(fpWrite_txt, "%010d   IMG   %sshot%05d.jpg   seqnum %05d\n",
-	   timestamp, _save_folder, seq_num-1, seq_num);
+	fprintf(fpWrite_txt, "%010d   IMG   shot%04d.jpeg   seqnum %05d\n",
+	   timestamp, seq_num-1, seq_num);
 	return 0;
 }
 
@@ -104,7 +105,7 @@ int write_imu_meas(unsigned short seq_num, unsigned int timestamp, short *data_a
 	if(fpWrite_txt == NULL) return -1;
 	
 	fprintf(fpWrite_txt, "%010d   IMU   %06d %06d %06d %06d %06d %06d  seqnum %05d\n", timestamp, 
-	    data_arr[0], data_arr[1], data_arr[2], data_arr[3], data_arr[4], data_arr[5], seq_num);
+	    data_arr[3], data_arr[4], data_arr[5],data_arr[0], data_arr[1], data_arr[2], seq_num); // first gyo, then acc.
 	return 0;
 }
 
@@ -168,7 +169,9 @@ int decode_msg(char *buff_rx)
 	}
 	else if(sync_obj.state == WORKING)   
 	{
-		sync_obj.state = FINISHED;
+		sync_obj.imgts_count_wrong ++;
+
+		// sync_obj.state = FINISHED;
 			printf("\n[debug] Msg header decode wrong. maybe the header transformed wrong, enter FINISHED\n");
 	}
 	return -1;
@@ -206,6 +209,7 @@ void *Mlt_SPI_transfer(void *frame_count_in)
 		//.speed_hz = speed,
 		//.bits_per_word = bits,
 	//};
+	sync_obj.imgts_count_wrong = 0;
 	
 	sync_obj.SPI_enable = 1;
 	sync_obj.state = STAND_BY;
@@ -227,7 +231,7 @@ void *Mlt_SPI_transfer(void *frame_count_in)
 			{
 				sync_obj.state = FINISHED;
 				printf("\n[debug] spi wait toolong time.enter FINISHED\n");
-
+				printf("FINISH LOG txt ... with image %d and imageTS %d with wrong:%d\n", sync_obj.img_count, sync_obj.imgts_count, sync_obj.ts_video.tv_nsec, sync_obj.imgts_count_wrong);
 			}
 			usleep(100);
 			//printf("for_now.tv_sec - sync_obj.ts_trigger.tv_sec: %d with flag %d \n", for_now.tv_sec - sync_obj.ts_trigger.tv_sec, sync_obj.state);

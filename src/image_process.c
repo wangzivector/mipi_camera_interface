@@ -147,7 +147,7 @@ int LoadSaveFile(const struct buffer *buf_img){
 
         case JPEG_SEP_SAVE:
             
-            sprintf(picname, "%sov9281_%d*%d_%04d.jpeg",save_folder, frame_width, frame_height, tempsave_index);
+            sprintf(picname, "%sshot%04d.jpg",save_folder, tempsave_index);
             printf("\nstart jpeg encode and saved: %s\n", picname);
 
         clock_gettime(CLOCK_REALTIME, &begin);
@@ -177,12 +177,12 @@ int FinishSaveFile(void)
             break;
 
             case FINAL_SEP_SAVE:
-                sprintf(picname, "%sov9281_%d*%d_%04d%s",save_folder, frame_width, frame_height, free_index, SAVE_AS_JPG ? ".jpeg":".bmp");
+                sprintf(picname, "%sshot%04d%s",save_folder, free_index, SAVE_AS_JPG ? ".jpeg":".bmp");
                 printf(" image saved: %s", picname);
                 if(SAVE_AS_JPG)
                 GenJpegFile(tempsave[free_index].start, 1, frame_width, frame_height, picname);
                 else
-                GenBmpFile(tempsave[free_index].start, 8, frame_width,frame_height, picname); 
+                GenBmpFile(tempsave[free_index].start, 8, frame_width, frame_height, picname); 
             break;
 
             case FINAL_COM_SAVE:

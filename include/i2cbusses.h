@@ -58,6 +58,7 @@ struct sync_index
     struct timespec ts_trigger;
 
     unsigned int imgts_count;
+    unsigned int imgts_count_wrong;
     unsigned int img_count;
     unsigned char SPI_enable;
     
